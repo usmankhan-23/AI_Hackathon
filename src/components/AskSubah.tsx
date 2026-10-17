@@ -31,7 +31,7 @@ export default function AskSubah({ lang }: AskSubahProps) {
   };
 
   return (
-    <section className="subah-ask" aria-label="Ask Subah">
+    <section className="subah-ask" aria-label="Ask Subah" id="ask-subah">
       <div className="subah-ask__header">
         <span className="subah-ask__icon" aria-hidden="true">◈</span>
         <div>

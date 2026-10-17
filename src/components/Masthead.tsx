@@ -85,13 +85,25 @@ export default function Masthead({ lang, onLangChange, editionNow }: MastheadPro
 
       {/* Navigation */}
       <nav className="subah-nav" aria-label="Main navigation">
-        {NAV_LINKS.map((link) => (
+        {NAV_LINKS.map((link) => link.id === "archive" ? (
+          <span
+            key={link.id}
+            className="subah-nav__link"
+            lang={lang}
+            dir={lang === "ur" ? "rtl" : "ltr"}
+            aria-label={link[lang]}
+            aria-disabled="true"
+            title={lang === "ur" ? "آرکائیو ابھی دستیاب نہیں" : "Archive is not available yet"}
+          >
+            {link[lang]}
+          </span>
+        ) : (
           <a
             key={link.id}
             href={`#${link.id}`}
-          className="subah-nav__link"
-          lang={lang}
-          dir={lang === "ur" ? "rtl" : "ltr"}
+            className="subah-nav__link"
+            lang={lang}
+            dir={lang === "ur" ? "rtl" : "ltr"}
             aria-label={link[lang]}
           >
             {link[lang]}
