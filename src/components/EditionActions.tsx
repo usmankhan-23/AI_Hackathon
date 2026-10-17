@@ -4,19 +4,15 @@ type Lang = "en" | "ur";
 
 interface EditionActionsProps {
   lang: Lang;
+  onDownloadPdf: () => void;
+  pdfGenerating: boolean;
+  pdfError: string | null;
+  onOpenArchive: () => void;
   onRefresh: () => void;
   refreshing: boolean;
 }
 
-export default function EditionActions({ lang, onRefresh, refreshing }: EditionActionsProps) {
-  const placeholder = (action: string) => {
-    alert(
-      lang === "ur"
-        ? `${action} — یہ فیچر اگلے مرحلے میں شامل ہوگا۔`
-        : `${action} — This feature will be available in a future stage.`
-    );
-  };
-
+export default function EditionActions({ lang, onDownloadPdf, pdfGenerating, pdfError, onOpenArchive, onRefresh, refreshing }: EditionActionsProps) {
   return (
     <aside className="subah-edition-actions" aria-label="Edition controls">
       <h3 className="subah-edition-actions__title">
@@ -25,19 +21,16 @@ export default function EditionActions({ lang, onRefresh, refreshing }: EditionA
       <div className="subah-edition-actions__btns">
         <button
           className="subah-btn subah-btn--outline"
-          onClick={() =>
-            placeholder(lang === "ur" ? "PDF ڈاؤن لوڈ" : "Download PDF")
-          }
+          onClick={onDownloadPdf}
+          disabled={pdfGenerating}
           aria-label={lang === "ur" ? "PDF ڈاؤن لوڈ کریں" : "Download newspaper PDF"}
         >
           <span aria-hidden="true">⬇</span>
-          {lang === "ur" ? "PDF ڈاؤن لوڈ" : "Download PDF"}
+          {pdfGenerating ? (lang === "ur" ? "PDF تیار ہو رہی ہے…" : "Generating PDF…") : (lang === "ur" ? "PDF ڈاؤن لوڈ" : "Download PDF")}
         </button>
         <button
           className="subah-btn subah-btn--outline"
-          onClick={() =>
-            placeholder(lang === "ur" ? "پچھلے ایڈیشن" : "Previous editions")
-          }
+          onClick={onOpenArchive}
           aria-label={lang === "ur" ? "پچھلے ایڈیشن دیکھیں" : "View previous editions"}
         >
           <span aria-hidden="true">◷</span>
@@ -53,10 +46,11 @@ export default function EditionActions({ lang, onRefresh, refreshing }: EditionA
           {refreshing ? (lang === "ur" ? "تازہ ہو رہا ہے…" : "Refreshing…") : (lang === "ur" ? "تازہ کریں" : "Refresh")}
         </button>
       </div>
+      {pdfError && <p className="subah-archive-message" role="alert">{pdfError}</p>}
       <p className="subah-demo-note">
         {lang === "ur"
-          ? "PDF اور آرکائیو کے کنٹرول ابھی ڈیمو ہیں۔"
-          : "PDF download and archive controls are still demos."}
+          ? "پچھلے ایڈیشن صرف اسی براؤزر میں محفوظ ہیں۔"
+          : "Previous editions are stored only in this browser."}
       </p>
     </aside>
   );

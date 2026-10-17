@@ -7,7 +7,17 @@ import LeadStory from "@/components/LeadStory";
 import ArticleCard from "@/components/ArticleCard";
 import AskSubah from "@/components/AskSubah";
 import EditionActions from "@/components/EditionActions";
+import EditionArchive from "@/components/EditionArchive";
 import { Article, TopicKey } from "@/lib/data";
+import {
+  ArchivedEdition,
+  deduplicateEditionArticles,
+  editionDateInKarachi,
+  groupEditionArticles,
+  readArchivedEditions,
+  saveEditionSnapshot,
+} from "@/lib/edition-archive";
+import { downloadEditionPdf } from "@/lib/edition-pdf";
 
 type Lang = "en" | "ur";
 type NewsSource = {
@@ -19,12 +29,6 @@ type NewsSource = {
   error?: string;
 };
 type NewsPayload = { updatedAt: string; articles: Article[]; sources: NewsSource[]; error?: string };
-
-const topicGroups: { id: string; label: { en: string; ur: string }; topics: string[] }[] = [
-  { id: "tech-ai", label: { en: "Technology & AI", ur: "ٹیکنالوجی اور مصنوعی ذہانت" }, topics: ["Technology", "Artificial Intelligence"] },
-  { id: "pak-world", label: { en: "Pakistan & World", ur: "پاکستان اور دنیا" }, topics: ["Pakistan", "World"] },
-  { id: "sci-biz", label: { en: "Science & Business", ur: "سائنس اور کاروبار" }, topics: ["Science", "Business"] },
-];
 
 function isArticle(value: unknown): value is Article {
   if (!value || typeof value !== "object") return false;
@@ -53,13 +57,42 @@ function isNewsPayload(value: unknown): value is NewsPayload {
 export default function HomeClient({ editionNow }: { editionNow: string }) {
   const [lang, setLang] = useState<Lang>("en");
   const [selectedTopics, setSelectedTopics] = useState<TopicKey[]>(["Artificial Intelligence", "Pakistan"]);
+  const selectedTopicsRef = useRef(selectedTopics);
   const [articles, setArticles] = useState<Article[]>([]);
   const [sources, setSources] = useState<NewsSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [archivedEditions, setArchivedEditions] = useState<ArchivedEdition[]>([]);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const isRtl = lang === "ur";
+
+  const handleTopicsChange = useCallback((topics: TopicKey[]) => {
+    selectedTopicsRef.current = topics;
+    setSelectedTopics(topics);
+  }, []);
+
+  const saveCurrentEdition = useCallback((nextArticles: Article[]) => {
+    const snapshotArticles = deduplicateEditionArticles(nextArticles);
+    if (snapshotArticles.length === 0) return;
+    const editionDate = editionDateInKarachi(editionNow);
+    const leadArticleId = [...snapshotArticles]
+      .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0]?.id ?? null;
+    const result = saveEditionSnapshot({
+      id: `subah-${editionDate}`,
+      editionDate,
+      createdAt: new Date().toISOString(),
+      topics: selectedTopicsRef.current,
+      articles: snapshotArticles,
+      leadArticleId,
+    });
+    setArchivedEditions(result.editions);
+    setArchiveError(result.error);
+  }, [editionNow]);
 
   const loadNews = useCallback(async (refresh = false) => {
     activeRequest.current?.abort();
@@ -76,6 +109,7 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
       setSources(body.sources);
       if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : "News could not be loaded.");
       setArticles(body.articles);
+      saveCurrentEdition(body.articles);
     } catch (cause) {
       if (controller.signal.aborted) return;
       const message = cause instanceof Error ? cause.message : "News could not be loaded.";
@@ -87,6 +121,11 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
         activeRequest.current = null;
       }
     }
+  }, [saveCurrentEdition]);
+
+  useEffect(() => {
+    const loadArchive = window.setTimeout(() => setArchivedEditions(readArchivedEditions()), 0);
+    return () => window.clearTimeout(loadArchive);
   }, []);
 
   useEffect(() => {
@@ -97,15 +136,7 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     };
   }, [loadNews]);
 
-  const seenStoryIds = new Set<string>();
-  const seenStoryUrls = new Set<string>();
-  const displayArticles = articles.filter((article) => {
-    const urlKey = article.sourceUrl.split(/[?#]/, 1)[0].replace(/\/$/, "").toLowerCase();
-    if (seenStoryIds.has(article.id) || seenStoryUrls.has(urlKey)) return false;
-    seenStoryIds.add(article.id);
-    seenStoryUrls.add(urlKey);
-    return true;
-  });
+  const displayArticles = deduplicateEditionArticles(articles);
   const lead = [...displayArticles]
     .filter((article) => Number.isFinite(Date.parse(article.publishedAt)))
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0];
@@ -114,21 +145,33 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     ? (lang === "ur" ? `آپ کی دلچسپی کے موضوعات: ${leadMatches.join("، ")}` : `Matches your interests in ${leadMatches.join(" and ")}.`)
     : (lang === "ur" ? `${lead?.sourceName ?? ""} سے تازہ خبر` : `Latest from ${lead?.sourceName ?? "the publisher"}.`);
 
-  const assigned = new Set(lead ? [lead.id] : []);
-  const sections = topicGroups.map((group) => {
-    const groupArticles = displayArticles.filter((article) =>
-      !assigned.has(article.id) && article.topics.some((topic) => group.topics.includes(topic))
-    );
-    groupArticles.forEach((article) => assigned.add(article.id));
-    return { ...group, articles: groupArticles };
-  }).filter((section) => section.articles.length > 0);
-  const otherArticles = displayArticles.filter((article) => !assigned.has(article.id));
-  if (otherArticles.length) sections.push({
-    id: "other-news",
-    label: { en: "More News", ur: "مزید خبریں" },
-    topics: [],
-    articles: otherArticles,
-  });
+  const sections = groupEditionArticles(displayArticles, lead?.id ?? null);
+
+  const handleDownloadCurrentPdf = async () => {
+    setPdfError(null);
+    setPdfGenerating(true);
+    try {
+      await downloadEditionPdf({
+        editionDate: editionDateInKarachi(editionNow),
+        topics: selectedTopics,
+        articles: displayArticles,
+        leadArticleId: lead?.id ?? null,
+      });
+    } catch (cause) {
+      setPdfError(cause instanceof Error ? cause.message : "PDF generation failed. Please try again.");
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+
+  const handleDownloadArchivedPdf = async (edition: ArchivedEdition) => {
+    await downloadEditionPdf({
+      editionDate: edition.editionDate,
+      topics: edition.topics,
+      articles: edition.articles,
+      leadArticleId: edition.leadArticleId,
+    });
+  };
 
   const sourceStatus = sources.length > 0 && (
     <p className="subah-section__subtitle" aria-label={lang === "ur" ? "ذرائع کی کیفیت" : "News source status"}>
@@ -150,7 +193,7 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
                 {lang === "ur" ? "اپنی پسندیدہ موضوعات منتخب کریں اور اپنا اخبار ذاتی بنائیں۔" : "Select topics you care about to personalise your edition."}
               </p>
             </div>
-            <TopicSelector selected={selectedTopics} onChange={setSelectedTopics} lang={lang} />
+            <TopicSelector selected={selectedTopics} onChange={handleTopicsChange} lang={lang} />
           </section>
 
           <div className="subah-rule" role="separator" />
@@ -197,9 +240,25 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
           <AskSubah lang={lang} />
         </main>
         <aside className="subah-sidebar">
-          <EditionActions lang={lang} onRefresh={() => loadNews(true)} refreshing={refreshing} />
+          <EditionActions
+            lang={lang}
+            onDownloadPdf={() => void handleDownloadCurrentPdf()}
+            pdfGenerating={pdfGenerating}
+            pdfError={pdfError}
+            onOpenArchive={() => setArchiveOpen(true)}
+            onRefresh={() => loadNews(true)}
+            refreshing={refreshing}
+          />
         </aside>
       </div>
+      <EditionArchive
+        open={archiveOpen}
+        editions={archivedEditions}
+        lang={lang}
+        storageError={archiveError}
+        onClose={() => setArchiveOpen(false)}
+        onDownload={handleDownloadArchivedPdf}
+      />
       <footer className="subah-footer" role="contentinfo">
         <p><strong>SUBAH</strong>{" "}{lang === "ur" ? "— ہیکاتھون پروجیکٹ · براہ راست خبریں" : "— Hackathon Project · Live publisher headlines"}</p>
       </footer>
