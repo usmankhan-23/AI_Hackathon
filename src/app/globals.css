@@ -272,6 +272,49 @@ body {
   margin-top: var(--space-md);
 }
 
+.subah-filter-help {
+  color: var(--ink-light);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  max-width: 48rem;
+  margin: 0 0 var(--space-sm);
+}
+
+.subah-filter-group {
+  border-top: 1px solid var(--rule);
+  padding: 0.55rem 0;
+}
+
+.subah-filter-group:last-of-type { border-bottom: 1px solid var(--rule); }
+
+.subah-filter-group > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-mid);
+  list-style-position: inside;
+}
+
+.subah-filter-group[open] > summary { margin-bottom: var(--space-sm); }
+
+.subah-filter-count {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+
+.subah-filter-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .subah-chips {
   display: flex;
   flex-wrap: wrap;
@@ -315,6 +358,12 @@ body {
   color: var(--ink-light);
   font-style: italic;
   margin-top: var(--space-xs);
+}
+
+.subah-tag--region {
+  background: var(--ivory-dark);
+  border-style: dashed;
+  letter-spacing: 0.04em;
 }
 
 /* ─── Lead story ────────────────────────────────────────────────────────── */

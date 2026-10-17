@@ -1,4 +1,5 @@
-import type { Article, TopicKey } from "@/lib/data";
+import type { Article, RegionKey, SubjectKey } from "./data";
+import { normalizeArticleTaxonomy } from "./news-classification";
 
 const STORAGE_KEY = "subah:editions:v1";
 const MAX_SAVED_EDITIONS = 60;
@@ -7,7 +8,10 @@ export interface ArchivedEdition {
   id: string;
   editionDate: string;
   createdAt: string;
-  topics: TopicKey[];
+  subjects: SubjectKey[];
+  regions: RegionKey[];
+  /** Legacy mixed preferences are read only to migrate older browser editions. */
+  topics?: string[];
   articles: Article[];
   leadArticleId: string | null;
 }
@@ -32,17 +36,43 @@ function isArticle(value: unknown): value is Article {
     typeof item.sourceUrl === "string" && /^https?:\/\//i.test(item.sourceUrl) &&
     typeof item.publishedAt === "string" && Number.isFinite(Date.parse(item.publishedAt)) &&
     Array.isArray(item.topics) && item.topics.every((topic) => typeof topic === "string") &&
-    typeof item.readingMinutes === "number";
+    (item.regions === undefined || (Array.isArray(item.regions) && item.regions.every((region) => typeof region === "string"))) &&
+    typeof item.readingMinutes === "number" && Number.isFinite(item.readingMinutes);
 }
 
-function isArchivedEdition(value: unknown): value is ArchivedEdition {
-  if (!value || typeof value !== "object") return false;
+export function migrateArchivedEdition(value: unknown): ArchivedEdition | null {
+  if (!value || typeof value !== "object") return null;
   const edition = value as Record<string, unknown>;
-  return typeof edition.id === "string" && typeof edition.editionDate === "string" &&
+  if (!(typeof edition.id === "string" && typeof edition.editionDate === "string" &&
     typeof edition.createdAt === "string" && Number.isFinite(Date.parse(edition.createdAt)) &&
-    Array.isArray(edition.topics) && edition.topics.every((topic) => typeof topic === "string") &&
     Array.isArray(edition.articles) && edition.articles.every(isArticle) &&
-    (typeof edition.leadArticleId === "string" || edition.leadArticleId === null);
+    (typeof edition.leadArticleId === "string" || edition.leadArticleId === null))) return null;
+
+  const legacyTopics = Array.isArray(edition.topics)
+    ? edition.topics.filter((item): item is string => typeof item === "string")
+    : [];
+  const subjectNames: SubjectKey[] = ["Artificial Intelligence", "Technology", "Politics & Government", "Business & Economy", "Sports", "Science", "Health & Medicine", "Climate & Environment", "Education", "Culture & Entertainment"];
+  const regionNames: RegionKey[] = ["Pakistan", "South Asia", "East Asia", "Southeast Asia", "Middle East & North Africa", "Europe", "Africa", "North America", "Latin America", "Oceania", "Global"];
+  const legacySubjectAliases: Record<string, SubjectKey> = { Business: "Business & Economy", Politics: "Politics & Government", Health: "Health & Medicine", Environment: "Climate & Environment", Culture: "Culture & Entertainment" };
+  const subjects = Array.isArray(edition.subjects)
+    ? edition.subjects.filter((item): item is SubjectKey => typeof item === "string" && subjectNames.includes(item as SubjectKey))
+    : legacyTopics.flatMap((topic) => {
+      if (subjectNames.includes(topic as SubjectKey)) return [topic as SubjectKey];
+      return legacySubjectAliases[topic] ? [legacySubjectAliases[topic]] : [];
+    });
+  const regions = Array.isArray(edition.regions)
+    ? edition.regions.filter((item): item is RegionKey => typeof item === "string" && regionNames.includes(item as RegionKey))
+    : legacyTopics.filter((topic) => topic === "Pakistan" || topic === "World").map((topic): RegionKey => topic === "World" ? "Global" : "Pakistan");
+
+  return {
+    id: edition.id,
+    editionDate: edition.editionDate,
+    createdAt: edition.createdAt,
+    subjects,
+    regions,
+    articles: deduplicateEditionArticles((edition.articles as Article[]).map(normalizeArticleTaxonomy)),
+    leadArticleId: edition.leadArticleId,
+  };
 }
 
 export function readArchivedEditions(): ArchivedEdition[] {
@@ -51,7 +81,8 @@ export function readArchivedEditions(): ArchivedEdition[] {
     if (!serialized) return [];
     const parsed: unknown = JSON.parse(serialized);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isArchivedEdition).sort((a, b) => b.editionDate.localeCompare(a.editionDate));
+    return parsed.map(migrateArchivedEdition).filter((item): item is ArchivedEdition => item !== null)
+      .sort((a, b) => b.editionDate.localeCompare(a.editionDate));
   } catch {
     return [];
   }
@@ -94,8 +125,10 @@ export interface EditionSection {
 
 const SECTION_GROUPS = [
   { id: "tech-ai", heading: "Technology & AI", label: { en: "Technology & AI", ur: "ٹیکنالوجی اور مصنوعی ذہانت" }, topics: ["Technology", "Artificial Intelligence"] },
-  { id: "pak-world", heading: "Pakistan & World", label: { en: "Pakistan & World", ur: "پاکستان اور دنیا" }, topics: ["Pakistan", "World"] },
-  { id: "sci-biz", heading: "Science & Business", label: { en: "Science & Business", ur: "سائنس اور کاروبار" }, topics: ["Science", "Business"] },
+  { id: "politics-economy", heading: "Politics & Economy", label: { en: "Politics & Economy", ur: "سیاست اور معیشت" }, topics: ["Politics & Government", "Business & Economy"] },
+  { id: "science-environment", heading: "Science & Environment", label: { en: "Science & Environment", ur: "سائنس اور ماحول" }, topics: ["Science", "Climate & Environment"] },
+  { id: "health-education", heading: "Health & Education", label: { en: "Health & Education", ur: "صحت اور تعلیم" }, topics: ["Health & Medicine", "Education"] },
+  { id: "culture-sports", heading: "Culture & Sports", label: { en: "Culture & Sports", ur: "ثقافت اور کھیل" }, topics: ["Culture & Entertainment", "Sports"] },
 ];
 
 export function groupEditionArticles(articles: Article[], leadArticleId: string | null = null): EditionSection[] {

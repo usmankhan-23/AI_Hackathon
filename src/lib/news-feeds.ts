@@ -1,4 +1,4 @@
-import type { TopicKey } from "@/lib/data";
+import type { RegionKey, SubjectKey } from "@/lib/data";
 
 export interface NewsFeed {
   id: string;
@@ -6,7 +6,8 @@ export interface NewsFeed {
   url: string;
   allowedFeedHosts: string[];
   allowedArticleHosts: string[];
-  defaultTopics: TopicKey[];
+  defaultSubjects: SubjectKey[];
+  defaultRegions: RegionKey[];
 }
 
 export const NEWS_FEEDS: NewsFeed[] = [
@@ -16,7 +17,8 @@ export const NEWS_FEEDS: NewsFeed[] = [
     url: "https://www.dawn.com/feeds/pakistan/",
     allowedFeedHosts: ["dawn.com"],
     allowedArticleHosts: ["dawn.com"],
-    defaultTopics: ["Pakistan"],
+    defaultSubjects: [],
+    defaultRegions: ["Pakistan"],
   },
   {
     id: "bbc-technology",
@@ -24,7 +26,8 @@ export const NEWS_FEEDS: NewsFeed[] = [
     url: "https://feeds.bbci.co.uk/news/technology/rss.xml",
     allowedFeedHosts: ["bbci.co.uk"],
     allowedArticleHosts: ["bbc.co.uk", "bbc.com"],
-    defaultTopics: ["Technology"],
+    defaultSubjects: ["Technology"],
+    defaultRegions: [],
   },
   {
     id: "bbc-world",
@@ -32,6 +35,16 @@ export const NEWS_FEEDS: NewsFeed[] = [
     url: "https://feeds.bbci.co.uk/news/world/rss.xml",
     allowedFeedHosts: ["bbci.co.uk"],
     allowedArticleHosts: ["bbc.co.uk", "bbc.com"],
-    defaultTopics: ["World"],
+    defaultSubjects: [],
+    defaultRegions: [],
+  },
+  {
+    id: "bbc-sport",
+    name: "BBC Sport",
+    url: "https://feeds.bbci.co.uk/sport/rss.xml",
+    allowedFeedHosts: ["bbci.co.uk"],
+    allowedArticleHosts: ["bbc.co.uk", "bbc.com"],
+    defaultSubjects: ["Sports"],
+    defaultRegions: [],
   },
 ];

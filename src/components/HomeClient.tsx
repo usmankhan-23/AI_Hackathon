@@ -8,7 +8,7 @@ import ArticleCard from "@/components/ArticleCard";
 import AskSubah from "@/components/AskSubah";
 import EditionActions from "@/components/EditionActions";
 import EditionArchive from "@/components/EditionArchive";
-import { Article, TopicKey } from "@/lib/data";
+import { Article, REGIONS, SUBJECTS, type RegionKey, type SubjectKey } from "@/lib/data";
 import {
   ArchivedEdition,
   deduplicateEditionArticles,
@@ -18,6 +18,9 @@ import {
   saveEditionSnapshot,
 } from "@/lib/edition-archive";
 import { downloadEditionPdf } from "@/lib/edition-pdf";
+import { filterArticles, normalizeArticleTaxonomy } from "@/lib/news-classification";
+
+const PREFERENCES_KEY = "subah:filters:v1";
 
 type Lang = "en" | "ur";
 type NewsSource = {
@@ -39,6 +42,7 @@ function isArticle(value: unknown): value is Article {
     typeof article.sourceUrl === "string" && /^https?:\/\//i.test(article.sourceUrl) &&
     typeof article.publishedAt === "string" && Number.isFinite(Date.parse(article.publishedAt)) &&
     Array.isArray(article.topics) && article.topics.every((topic) => typeof topic === "string") &&
+    (article.regions === undefined || (Array.isArray(article.regions) && article.regions.every((region) => typeof region === "string"))) &&
     typeof article.readingMinutes === "number" && Number.isFinite(article.readingMinutes);
 }
 
@@ -56,8 +60,11 @@ function isNewsPayload(value: unknown): value is NewsPayload {
 
 export default function HomeClient({ editionNow }: { editionNow: string }) {
   const [lang, setLang] = useState<Lang>("en");
-  const [selectedTopics, setSelectedTopics] = useState<TopicKey[]>(["Artificial Intelligence", "Pakistan"]);
-  const selectedTopicsRef = useRef(selectedTopics);
+  const [selectedRegions, setSelectedRegions] = useState<RegionKey[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<SubjectKey[]>([]);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const selectedRegionsRef = useRef<RegionKey[]>([]);
+  const selectedSubjectsRef = useRef<SubjectKey[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [sources, setSources] = useState<NewsSource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,14 +78,9 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
   const activeRequest = useRef<AbortController | null>(null);
   const isRtl = lang === "ur";
 
-  const handleTopicsChange = useCallback((topics: TopicKey[]) => {
-    selectedTopicsRef.current = topics;
-    setSelectedTopics(topics);
-  }, []);
-
   const saveCurrentEdition = useCallback((nextArticles: Article[]) => {
-    const snapshotArticles = deduplicateEditionArticles(nextArticles);
-    if (snapshotArticles.length === 0) return;
+    if (!preferencesLoaded) return;
+    const snapshotArticles = deduplicateEditionArticles(filterArticles(nextArticles, selectedRegionsRef.current, selectedSubjectsRef.current));
     const editionDate = editionDateInKarachi(editionNow);
     const leadArticleId = [...snapshotArticles]
       .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0]?.id ?? null;
@@ -86,13 +88,14 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
       id: `subah-${editionDate}`,
       editionDate,
       createdAt: new Date().toISOString(),
-      topics: selectedTopicsRef.current,
+      subjects: selectedSubjectsRef.current,
+      regions: selectedRegionsRef.current,
       articles: snapshotArticles,
       leadArticleId,
     });
     setArchivedEditions(result.editions);
     setArchiveError(result.error);
-  }, [editionNow]);
+  }, [editionNow, preferencesLoaded]);
 
   const loadNews = useCallback(async (refresh = false) => {
     activeRequest.current?.abort();
@@ -108,8 +111,9 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
       if (!isNewsPayload(body)) throw new Error("The news service returned an invalid response.");
       setSources(body.sources);
       if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : "News could not be loaded.");
-      setArticles(body.articles);
-      saveCurrentEdition(body.articles);
+      const normalizedArticles = body.articles.map(normalizeArticleTaxonomy);
+      setArticles(normalizedArticles);
+      saveCurrentEdition(normalizedArticles);
     } catch (cause) {
       if (controller.signal.aborted) return;
       const message = cause instanceof Error ? cause.message : "News could not be loaded.";
@@ -129,6 +133,41 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
   }, []);
 
   useEffect(() => {
+    const restore = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem(PREFERENCES_KEY);
+        if (raw) {
+          const saved: unknown = JSON.parse(raw);
+          if (saved && typeof saved === "object") {
+            const value = saved as Record<string, unknown>;
+            const regions = Array.isArray(value.regions) ? value.regions.filter((item): item is RegionKey => typeof item === "string" && REGIONS.includes(item as RegionKey)) : [];
+            const subjects = Array.isArray(value.subjects) ? value.subjects.filter((item): item is SubjectKey => typeof item === "string" && SUBJECTS.includes(item as SubjectKey)) : [];
+            selectedRegionsRef.current = regions;
+            selectedSubjectsRef.current = subjects;
+            setSelectedRegions(regions);
+            setSelectedSubjects(subjects);
+          }
+        }
+      } catch { /* Malformed or unavailable storage means All News. */ }
+      setPreferencesLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(restore);
+  }, []);
+
+  const handleFiltersChange = useCallback((regions: RegionKey[], subjects: SubjectKey[]) => {
+    selectedRegionsRef.current = regions;
+    selectedSubjectsRef.current = subjects;
+    setSelectedRegions(regions);
+    setSelectedSubjects(subjects);
+    try {
+      if (regions.length === 0 && subjects.length === 0) window.localStorage.removeItem(PREFERENCES_KEY);
+      else window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ regions, subjects }));
+      setArchiveError(null);
+    } catch { setArchiveError("This browser could not save your filter preferences."); }
+    if (articles.length) saveCurrentEdition(articles);
+  }, [articles, saveCurrentEdition]);
+
+  useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadNews(), 0);
     return () => {
       window.clearTimeout(initialLoad);
@@ -136,11 +175,11 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     };
   }, [loadNews]);
 
-  const displayArticles = deduplicateEditionArticles(articles);
+  const displayArticles = deduplicateEditionArticles(filterArticles(articles, selectedRegions, selectedSubjects));
   const lead = [...displayArticles]
     .filter((article) => Number.isFinite(Date.parse(article.publishedAt)))
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0];
-  const leadMatches = lead?.topics.filter((topic) => selectedTopics.includes(topic as TopicKey)) ?? [];
+  const leadMatches = lead ? [...lead.topics.filter((topic) => selectedSubjects.includes(topic)), ...lead.regions.filter((region) => selectedRegions.includes(region))] : [];
   const matchReason = leadMatches.length
     ? (lang === "ur" ? `آپ کی دلچسپی کے موضوعات: ${leadMatches.join("، ")}` : `Matches your interests in ${leadMatches.join(" and ")}.`)
     : (lang === "ur" ? `${lead?.sourceName ?? ""} سے تازہ خبر` : `Latest from ${lead?.sourceName ?? "the publisher"}.`);
@@ -153,7 +192,8 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     try {
       await downloadEditionPdf({
         editionDate: editionDateInKarachi(editionNow),
-        topics: selectedTopics,
+        subjects: selectedSubjects,
+        regions: selectedRegions,
         articles: displayArticles,
         leadArticleId: lead?.id ?? null,
       });
@@ -167,7 +207,8 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
   const handleDownloadArchivedPdf = async (edition: ArchivedEdition) => {
     await downloadEditionPdf({
       editionDate: edition.editionDate,
-      topics: edition.topics,
+      subjects: edition.subjects,
+      regions: edition.regions,
       articles: edition.articles,
       leadArticleId: edition.leadArticleId,
     });
@@ -193,7 +234,7 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
                 {lang === "ur" ? "اپنی پسندیدہ موضوعات منتخب کریں اور اپنا اخبار ذاتی بنائیں۔" : "Select topics you care about to personalise your edition."}
               </p>
             </div>
-            <TopicSelector selected={selectedTopics} onChange={handleTopicsChange} lang={lang} />
+            <TopicSelector selectedRegions={selectedRegions} selectedSubjects={selectedSubjects} onChange={handleFiltersChange} lang={lang} />
           </section>
 
           <div className="subah-rule" role="separator" />
@@ -221,17 +262,25 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
             <>
               {error && <section className="subah-section" role="alert"><p>{error}</p><button className="subah-btn subah-btn--outline" onClick={() => void loadNews(true)}>{lang === "ur" ? "دوبارہ کوشش کریں" : "Retry"}</button></section>}
               {refreshing && <p className="subah-demo-note" aria-live="polite">{lang === "ur" ? "خبریں تازہ کی جا رہی ہیں…" : "Refreshing news…"}</p>}
-              {lead && <LeadStory article={lead} matchReason={matchReason} lang={lang} selectedTopics={selectedTopics} />}
+              {displayArticles.length === 0 ? (
+                <section className="subah-section" role="status">
+                  <h2 className="subah-section__title">{lang === "ur" ? "ان فلٹرز سے کوئی خبر نہیں ملی" : "No articles match these filters"}</h2>
+                  <p className="subah-section__subtitle">{lang === "ur" ? "فلٹر صاف کر کے تمام خبریں دیکھیں۔" : "Clear your filters to see all available news."}</p>
+                  <button className="subah-btn subah-btn--outline" onClick={() => handleFiltersChange([], [])}>{lang === "ur" ? "تمام خبریں دکھائیں" : "Clear filters"}</button>
+                </section>
+              ) : <>
+              {lead && <LeadStory article={lead} matchReason={matchReason} lang={lang} />}
               <div className="subah-rule" role="separator" />
               {sections.map((section) => (
                 <section key={section.id} className="subah-section" id={section.id} aria-label={section.label[lang]} lang={lang} dir={isRtl ? "rtl" : "ltr"}>
                   <h2 className="subah-section__title subah-section__title--ruled">{section.label[lang]}</h2>
                   <div className="subah-cards-grid">
-                    {section.articles.map((article) => <ArticleCard key={article.id} article={article} lang={lang} selectedTopics={selectedTopics} editionNow={editionNow} />)}
+                    {section.articles.map((article) => <ArticleCard key={article.id} article={article} lang={lang} editionNow={editionNow} />)}
                   </div>
                 </section>
               ))}
               {sourceStatus}
+              </>}
             </>
           )}
           </div>

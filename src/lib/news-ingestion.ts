@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import Parser from "rss-parser";
 import { cacheLife, cacheTag } from "next/cache";
-import type { Article, TopicKey } from "@/lib/data";
-import type { NewsFeed } from "@/lib/news-feeds";
+import type { Article } from "./data";
+import type { NewsFeed } from "./news-feeds";
+import { classifyRegions, classifySubjects } from "./news-classification";
 
 const MAX_ARTICLES_PER_FEED = 12;
 const MAX_SUMMARY_LENGTH = 360;
@@ -27,19 +28,6 @@ export interface SourceResult {
   rejectedItems: number;
   error?: string;
 }
-
-const TOPIC_RULES: Array<{ topic: TopicKey; pattern: RegExp }> = [
-  { topic: "Artificial Intelligence", pattern: /\b(ai|artificial intelligence|machine learning|chatgpt|openai|llm)\b/i },
-  { topic: "Technology", pattern: /\b(technology|tech|cyber|software|internet|digital|smartphone|computer|app|chip)\b/i },
-  { topic: "Pakistan", pattern: /\b(pakistan|pakistani|karachi|lahore|islamabad|sindh|punjab)\b/i },
-  { topic: "World", pattern: /\b(world|global|international|united nations|g20|europe|africa|asia)\b/i },
-  {
-    topic: "Science",
-    pattern: /\b(science|scientific|scientists?|researchers?|research (?:paper|team|finds?|shows?|published)|laboratory|clinical trial|peer-reviewed|experiment(?:al)?|genome|quantum|physics|chemistry|biology|astronom(?:ers?|y|ical)|spacecraft|telescope|nasa|superconductor|climate change|global warming|carbon emissions)\b/i,
-  },
-  { topic: "Business", pattern: /\b(business|economy|economic|market|finance|company|trade|startup)\b/i },
-  { topic: "Sports", pattern: /\b(sport|football|cricket|tennis|olympic|rugby|basketball|tournament|league)\b/i },
-];
 
 function decodeXmlText(input: string): string {
   return input
@@ -136,14 +124,6 @@ function publicationDate(rawDate: string | undefined): string | null {
   return new Date(timestamp).toISOString();
 }
 
-export function classifyTopics(text: string, defaults: TopicKey[] = []): string[] {
-  const topics = new Set<string>(defaults);
-  for (const { topic, pattern } of TOPIC_RULES) {
-    if (pattern.test(text)) topics.add(topic);
-  }
-  return [...topics];
-}
-
 function publisherSummary(item: Parser.Item): string {
   for (const candidate of [item.summary, item.contentSnippet]) {
     const excerpt = plainTextExcerpt(candidate);
@@ -173,7 +153,8 @@ function toArticle(
     sourceName: feed.name,
     sourceUrl: canonicalUrl,
     publishedAt,
-    topics: classifyTopics(`${title} ${summary}`, feed.defaultTopics),
+    topics: classifySubjects(`${title} ${summary}`, feed.defaultSubjects),
+    regions: classifyRegions(`${title} ${summary}`, feed.defaultRegions),
     readingMinutes,
   };
 }
@@ -320,7 +301,8 @@ export function deduplicateArticles(articles: Article[]): Article[] {
       url: "",
       allowedFeedHosts: [],
       allowedArticleHosts: ["dawn.com", "bbc.co.uk", "bbc.com"],
-      defaultTopics: [],
+      defaultSubjects: [],
+      defaultRegions: [],
     });
     if (canonicalUrl && !unique.has(canonicalUrl)) unique.set(canonicalUrl, article);
   }

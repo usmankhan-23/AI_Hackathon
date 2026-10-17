@@ -1,6 +1,6 @@
 "use client";
 
-import { Article, TopicKey } from "@/lib/data";
+import type { Article } from "@/lib/data";
 
 type Lang = "en" | "ur";
 
@@ -8,7 +8,6 @@ interface LeadStoryProps {
   article: Article;
   matchReason: string;
   lang: Lang;
-  selectedTopics: TopicKey[];
 }
 
 /**
@@ -43,6 +42,7 @@ export default function LeadStory({ article, matchReason, lang }: LeadStoryProps
             {t}
           </span>
         ))}
+        {article.regions.map((region) => <span key={region} className="subah-tag subah-tag--lead subah-tag--region" lang="en">{region}</span>)}
       </div>
 
       {/*

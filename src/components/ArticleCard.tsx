@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Article, TopicKey } from "@/lib/data";
+import type { Article } from "@/lib/data";
 
 type Lang = "en" | "ur";
 
 interface ArticleCardProps {
   article: Article;
   lang: Lang;
-  selectedTopics: TopicKey[];
   editionNow: string;
 }
 
@@ -29,7 +28,7 @@ function formatRelativeTime(iso: string, editionNow: string, lang: Lang): string
   return `${mins}m ago`;
 }
 
-export default function ArticleCard({ article, lang, selectedTopics, editionNow }: ArticleCardProps) {
+export default function ArticleCard({ article, lang, editionNow }: ArticleCardProps) {
   const [liked, setLiked] = useState(false);
   const [skipped, setSkipped] = useState(false);
 
@@ -39,10 +38,6 @@ export default function ArticleCard({ article, lang, selectedTopics, editionNow 
    * from Date.now() differing between server prerender and client execution.
    */
   const relativeTime = formatRelativeTime(article.publishedAt, editionNow, lang);
-
-  const isRelevant =
-    selectedTopics.length === 0 ||
-    article.topics.some((t) => selectedTopics.includes(t as TopicKey));
 
   if (skipped) {
     return (
@@ -63,7 +58,7 @@ export default function ArticleCard({ article, lang, selectedTopics, editionNow 
 
   return (
     <article
-      className={`subah-card${liked ? " subah-card--liked" : ""}${!isRelevant ? " subah-card--dim" : ""}`}
+      className={`subah-card${liked ? " subah-card--liked" : ""}`}
     >
       <div className="subah-card__meta">
         <span className="subah-card__source">{article.sourceName}</span>
@@ -104,6 +99,7 @@ export default function ArticleCard({ article, lang, selectedTopics, editionNow 
             {t}
           </span>
         ))}
+        {article.regions.map((region) => <span key={region} className="subah-tag subah-tag--region" lang="en">{region}</span>)}
       </div>
 
       {/* Content-language notice shown only in Urdu mode */}

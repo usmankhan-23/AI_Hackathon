@@ -9,30 +9,63 @@ export interface Article {
   /** Clearly labeled placeholder URL for demo purposes */
   sourceUrl: string;
   publishedAt: string; // ISO 8601
-  topics: string[];
+  /** Subject matter tags only; geography is represented separately. */
+  topics: SubjectKey[];
+  regions: RegionKey[];
   readingMinutes: number;
   isLead?: boolean;
   imageAlt?: string;
 }
 
-export type TopicKey =
+export type SubjectKey =
   | "Artificial Intelligence"
   | "Technology"
-  | "Pakistan"
-  | "World"
+  | "Politics & Government"
+  | "Business & Economy"
+  | "Sports"
   | "Science"
-  | "Business"
-  | "Sports";
+  | "Health & Medicine"
+  | "Climate & Environment"
+  | "Education"
+  | "Culture & Entertainment";
 
-export const ALL_TOPICS: TopicKey[] = [
+/** Backwards-compatible name for components that previously used TopicKey. */
+export type TopicKey = SubjectKey;
+
+export type RegionKey =
+  | "Pakistan"
+  | "South Asia"
+  | "East Asia"
+  | "Southeast Asia"
+  | "Middle East & North Africa"
+  | "Europe"
+  | "Africa"
+  | "North America"
+  | "Latin America"
+  | "Oceania"
+  | "Global";
+
+export const SUBJECTS: SubjectKey[] = [
   "Artificial Intelligence",
   "Technology",
-  "Pakistan",
-  "World",
-  "Science",
-  "Business",
+  "Politics & Government",
+  "Business & Economy",
   "Sports",
+  "Science",
+  "Health & Medicine",
+  "Climate & Environment",
+  "Education",
+  "Culture & Entertainment",
 ];
+
+export const REGIONS: RegionKey[] = [
+  "Pakistan", "South Asia", "East Asia", "Southeast Asia",
+  "Middle East & North Africa", "Europe", "Africa", "North America",
+  "Latin America", "Oceania", "Global",
+];
+
+/** Kept as a source-compatible alias for any remaining presentation imports. */
+export const ALL_TOPICS = SUBJECTS;
 
 // ─── Lead Story ────────────────────────────────────────────────────────────────
 
@@ -46,6 +79,7 @@ export const LEAD_STORY: Article = {
   sourceUrl: "#demo-lead-source",
   publishedAt: "2026-10-17T07:30:00+05:00",
   topics: ["Artificial Intelligence", "Science"],
+  regions: ["Global"],
   readingMinutes: 6,
   isLead: true,
   imageAlt: "Abstract visualization of neural network overlaid on a laboratory",
@@ -66,6 +100,7 @@ export const TECH_AI_ARTICLES: Article[] = [
     sourceUrl: "#demo-tech-001",
     publishedAt: "2026-10-17T06:00:00+05:00",
     topics: ["Artificial Intelligence", "Technology"],
+    regions: ["Global"],
     readingMinutes: 4,
   },
   {
@@ -77,6 +112,7 @@ export const TECH_AI_ARTICLES: Article[] = [
     sourceUrl: "#demo-tech-002",
     publishedAt: "2026-10-17T05:15:00+05:00",
     topics: ["Technology", "Artificial Intelligence"],
+    regions: ["Global"],
     readingMinutes: 3,
   },
   {
@@ -87,7 +123,8 @@ export const TECH_AI_ARTICLES: Article[] = [
     sourceName: "Sample Silicon Review",
     sourceUrl: "#demo-tech-003",
     publishedAt: "2026-10-16T22:00:00+05:00",
-    topics: ["Technology", "Business"],
+    topics: ["Technology", "Business & Economy"],
+    regions: ["Global"],
     readingMinutes: 5,
   },
   {
@@ -99,6 +136,7 @@ export const TECH_AI_ARTICLES: Article[] = [
     sourceUrl: "#demo-tech-004",
     publishedAt: "2026-10-16T18:30:00+05:00",
     topics: ["Technology", "Artificial Intelligence"],
+    regions: ["Global"],
     readingMinutes: 4,
   },
 ];
@@ -114,7 +152,8 @@ export const PAKISTAN_WORLD_ARTICLES: Article[] = [
     sourceName: "Sample Business Daily (PK)",
     sourceUrl: "#demo-pak-001",
     publishedAt: "2026-10-17T08:00:00+05:00",
-    topics: ["Pakistan", "Business", "Technology"],
+    topics: ["Business & Economy", "Technology"],
+    regions: ["Pakistan"],
     readingMinutes: 3,
   },
   {
@@ -125,7 +164,8 @@ export const PAKISTAN_WORLD_ARTICLES: Article[] = [
     sourceName: "Sample Global Environment Monitor",
     sourceUrl: "#demo-pak-002",
     publishedAt: "2026-10-17T04:45:00+05:00",
-    topics: ["Pakistan", "World", "Science"],
+    topics: ["Climate & Environment", "Science"],
+    regions: ["Pakistan", "South Asia"],
     readingMinutes: 5,
   },
   {
@@ -136,7 +176,8 @@ export const PAKISTAN_WORLD_ARTICLES: Article[] = [
     sourceName: "Sample Dawn Tech",
     sourceUrl: "#demo-pak-003",
     publishedAt: "2026-10-16T20:00:00+05:00",
-    topics: ["Pakistan", "Artificial Intelligence", "Technology"],
+    topics: ["Artificial Intelligence", "Technology"],
+    regions: ["Pakistan"],
     readingMinutes: 4,
   },
   {
@@ -147,7 +188,8 @@ export const PAKISTAN_WORLD_ARTICLES: Article[] = [
     sourceName: "Sample Global Affairs",
     sourceUrl: "#demo-world-001",
     publishedAt: "2026-10-16T15:00:00+05:00",
-    topics: ["World", "Artificial Intelligence"],
+    topics: ["Politics & Government", "Artificial Intelligence"],
+    regions: ["Global"],
     readingMinutes: 5,
   },
 ];
@@ -164,6 +206,7 @@ export const SCIENCE_BUSINESS_ARTICLES: Article[] = [
     sourceUrl: "#demo-sci-001",
     publishedAt: "2026-10-17T03:30:00+05:00",
     topics: ["Science"],
+    regions: ["East Asia", "Europe"],
     readingMinutes: 7,
   },
   {
@@ -175,6 +218,7 @@ export const SCIENCE_BUSINESS_ARTICLES: Article[] = [
     sourceUrl: "#demo-sci-002",
     publishedAt: "2026-10-16T22:30:00+05:00",
     topics: ["Science", "Technology"],
+    regions: ["Global"],
     readingMinutes: 5,
   },
   {
@@ -185,7 +229,8 @@ export const SCIENCE_BUSINESS_ARTICLES: Article[] = [
     sourceName: "Sample Mobility Economics",
     sourceUrl: "#demo-biz-001",
     publishedAt: "2026-10-17T05:00:00+05:00",
-    topics: ["Business", "Science"],
+    topics: ["Business & Economy"],
+    regions: ["Global"],
     readingMinutes: 3,
   },
   {
@@ -196,7 +241,8 @@ export const SCIENCE_BUSINESS_ARTICLES: Article[] = [
     sourceName: "Sample Pakistan Economic Observer",
     sourceUrl: "#demo-biz-002",
     publishedAt: "2026-10-16T17:00:00+05:00",
-    topics: ["Business", "Pakistan"],
+    topics: ["Business & Economy", "Politics & Government"],
+    regions: ["Pakistan"],
     readingMinutes: 4,
   },
 ];

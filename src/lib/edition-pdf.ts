@@ -1,14 +1,16 @@
-import type { Article } from "@/lib/data";
-import { groupEditionArticles } from "@/lib/edition-archive";
+import type { jsPDF as JsPDF } from "jspdf";
+import type { Article, RegionKey, SubjectKey } from "./data";
+import { groupEditionArticles } from "./edition-archive";
 
 export interface EditionPdfInput {
   editionDate: string;
-  topics: string[];
+  subjects: SubjectKey[];
+  regions: RegionKey[];
   articles: Article[];
   leadArticleId: string | null;
 }
 
-export async function downloadEditionPdf(edition: EditionPdfInput): Promise<void> {
+export async function createEditionPdfDocument(edition: EditionPdfInput): Promise<JsPDF> {
   if (edition.articles.length === 0) throw new Error("There are no articles to export.");
 
   const { jsPDF } = await import("jspdf");
@@ -69,8 +71,10 @@ export async function downloadEditionPdf(edition: EditionPdfInput): Promise<void
   pdf.setLineWidth(0.5);
   pdf.line(margin, y, pageWidth - margin, y);
   y += 7;
-  if (edition.topics.length) {
-    addText(`Selected interests: ${edition.topics.join(" · ")}`, { size: 9, leading: 4.5, color: [107, 100, 85], after: 5 });
+  if (edition.subjects.length || edition.regions.length) {
+    addText(`Regions: ${edition.regions.join(" · ") || "All"}  |  Subjects: ${edition.subjects.join(" · ") || "All"}`, { size: 9, leading: 4.5, color: [107, 100, 85], after: 5 });
+  } else {
+    addText("All news", { size: 9, leading: 4.5, color: [107, 100, 85], after: 5 });
   }
 
   const addArticle = (article: Article, isLead = false) => {
@@ -110,5 +114,10 @@ export async function downloadEditionPdf(edition: EditionPdfInput): Promise<void
     pdf.text(`${page} / ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" });
   }
 
+  return pdf;
+}
+
+export async function downloadEditionPdf(edition: EditionPdfInput): Promise<void> {
+  const pdf = await createEditionPdfDocument(edition);
   pdf.save(`subah-edition-${edition.editionDate}.pdf`);
 }

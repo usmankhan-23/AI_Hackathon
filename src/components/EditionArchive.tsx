@@ -35,6 +35,7 @@ function SnapshotArticle({ article, lang }: { article: Article; lang: Lang }) {
       {article.summary && <p className="subah-card__summary" dir="auto">{article.summary}</p>}
       <div className="subah-card__tags">
         {article.topics.map((topic) => <span className="subah-tag" key={topic}>{topic}</span>)}
+        {article.regions.map((region) => <span className="subah-tag subah-tag--region" key={region}>{region}</span>)}
       </div>
       <a className="subah-action-btn subah-action-btn--link" href={article.sourceUrl} target="_blank" rel="noopener noreferrer">
         {lang === "ur" ? "اصل خبر کھولیں ↗" : "Open original story ↗"}
@@ -86,7 +87,8 @@ export default function EditionArchive({ open, editions, lang, storageError, onC
         {selectedEdition ? (
           <div className="subah-archive-reading">
             <p className="subah-section__subtitle">
-              {lang === "ur" ? "منتخب دلچسپیاں:" : "Selected interests:"} {selectedEdition.topics.length ? selectedEdition.topics.join(" · ") : (lang === "ur" ? "تمام موضوعات" : "All topics")}
+              {lang === "ur" ? "منتخب علاقے:" : "Selected regions:"} {selectedEdition.regions.join(" · ") || (lang === "ur" ? "تمام" : "All")}<br />
+              {lang === "ur" ? "منتخب موضوعات:" : "Selected subjects:"} {selectedEdition.subjects.join(" · ") || (lang === "ur" ? "تمام" : "All")}
             </p>
             {selectedEdition.articles.find((article) => article.id === selectedEdition.leadArticleId) && (
               <section className="subah-section">
@@ -114,7 +116,7 @@ export default function EditionArchive({ open, editions, lang, storageError, onC
               <article className="subah-archive-entry" key={edition.id}>
                 <div>
                   <h3>{formatDate(`${edition.editionDate}T12:00:00Z`, lang)}</h3>
-                  <p>{edition.articles.length} {lang === "ur" ? "مضامین" : "articles"} · {edition.topics.length ? edition.topics.join(" · ") : (lang === "ur" ? "تمام موضوعات" : "All topics")}</p>
+                  <p>{edition.articles.length} {lang === "ur" ? "مضامین" : "articles"} · {lang === "ur" ? "علاقے" : "Regions"}: {edition.regions.join(" · ") || (lang === "ur" ? "تمام" : "All")} · {lang === "ur" ? "موضوعات" : "Subjects"}: {edition.subjects.join(" · ") || (lang === "ur" ? "تمام" : "All")}</p>
                   <small>{lang === "ur" ? "محفوظ ہونے کا وقت:" : "Saved:"} {new Intl.DateTimeFormat(lang === "ur" ? "ur-PK" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(edition.createdAt))}</small>
                 </div>
                 <div className="subah-archive-dialog__actions">
