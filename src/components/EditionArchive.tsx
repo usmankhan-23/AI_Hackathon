@@ -11,6 +11,8 @@ interface EditionArchiveProps {
   editions: ArchivedEdition[];
   lang: Lang;
   storageError: string | null;
+  accountError?: string | null;
+  syncStatus?: "local" | "syncing" | "synced" | "migration";
   onClose: () => void;
   onDownload: (edition: ArchivedEdition) => Promise<void>;
 }
@@ -44,7 +46,7 @@ function SnapshotArticle({ article, lang }: { article: Article; lang: Lang }) {
   );
 }
 
-export default function EditionArchive({ open, editions, lang, storageError, onClose, onDownload }: EditionArchiveProps) {
+export default function EditionArchive({ open, editions, lang, storageError, accountError, syncStatus = "local", onClose, onDownload }: EditionArchiveProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   if (!open) return null;
@@ -82,6 +84,7 @@ export default function EditionArchive({ open, editions, lang, storageError, onC
         </header>
 
         {storageError && <p role="alert" className="subah-archive-message">{lang === "ur" ? "اس براؤزر میں ایڈیشن محفوظ نہیں ہو سکا۔" : storageError}</p>}
+        {accountError && <p role="alert" className="subah-archive-message">{accountError}</p>}
         {pdfError && <p role="alert" className="subah-archive-message">{pdfError}</p>}
 
         {selectedEdition ? (
@@ -132,7 +135,13 @@ export default function EditionArchive({ open, editions, lang, storageError, onC
           </div>
         )}
         <p className="subah-archive-local-note">
-          {lang === "ur" ? "یہ آرکائیو صرف اس براؤزر میں محفوظ ہے؛ دوسرے آلات سے ہم آہنگ نہیں۔" : "This archive is stored only in this browser and is not synced across devices."}
+          {syncStatus === "synced"
+            ? (lang === "ur" ? "ایڈیشن آپ کے اکاؤنٹ سے ہم آہنگ ہیں؛ براؤزر میں موجود کاپیاں بھی محفوظ رہتی ہیں۔" : "Editions sync to your account; browser copies are kept too.")
+            : syncStatus === "syncing"
+              ? (lang === "ur" ? "آپ کے اکاؤنٹ کے ایڈیشن لوڈ ہو رہے ہیں۔" : "Loading editions from your account.")
+              : syncStatus === "migration"
+                ? (lang === "ur" ? "مقامی ایڈیشن برقرار ہیں؛ درآمد کے لیے اوپر تصدیق کریں۔" : "Local editions are preserved; confirm above to import them.")
+                : (lang === "ur" ? "یہ آرکائیو صرف اس براؤزر میں محفوظ ہے؛ دوسرے آلات سے ہم آہنگ نہیں۔" : "This archive is stored only in this browser and is not synced across devices.")}
         </p>
       </section>
     </div>

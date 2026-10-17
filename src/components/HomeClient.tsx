@@ -9,18 +9,20 @@ import AskSubah from "@/components/AskSubah";
 import EditionActions from "@/components/EditionActions";
 import EditionArchive from "@/components/EditionArchive";
 import ReadingProfile from "@/components/ReadingProfile";
+import AccountAuth, { type AccountIdentity } from "@/components/AccountAuth";
 import { Article, REGIONS, SUBJECTS, type RegionKey, type SubjectKey } from "@/lib/data";
 import {
   ArchivedEdition,
   deduplicateEditionArticles,
   editionDateInKarachi,
   groupEditionArticles,
+  migrateArchivedEdition,
   readArchivedEditions,
   saveEditionSnapshot,
 } from "@/lib/edition-archive";
 import { downloadEditionPdf } from "@/lib/edition-pdf";
 import { filterArticles, normalizeArticleTaxonomy } from "@/lib/news-classification";
-import { clearReadingProfile, EMPTY_READING_PROFILE, getProfileMatches, rankArticlesForProfile, readReadingProfile, saveReadingProfile, type ReadingProfile as ReadingProfileValue } from "@/lib/reading-intelligence";
+import { clearReadingProfile, EMPTY_READING_PROFILE, getProfileMatches, normalizeReadingProfile, rankArticlesForProfile, readReadingProfile, saveReadingProfile, type ReadingProfile as ReadingProfileValue } from "@/lib/reading-intelligence";
 
 const PREFERENCES_KEY = "subah:filters:v1";
 
@@ -34,6 +36,23 @@ type NewsSource = {
   error?: string;
 };
 type NewsPayload = { updatedAt: string; articles: Article[]; sources: NewsSource[]; error?: string };
+type LocalMigration = { profile: ReadingProfileValue | null; editions: ArchivedEdition[] };
+
+function mergeEditionLists(remote: ArchivedEdition[], local: ArchivedEdition[]): ArchivedEdition[] {
+  const merged = new Map<string, ArchivedEdition>();
+  for (const edition of local) merged.set(edition.id, edition);
+  for (const edition of remote) merged.set(edition.id, edition);
+  return [...merged.values()].sort((a, b) => b.editionDate.localeCompare(a.editionDate));
+}
+
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
 
 function isArticle(value: unknown): value is Article {
   if (!value || typeof value !== "object") return false;
@@ -78,12 +97,38 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
   const [error, setError] = useState<string | null>(null);
   const [archivedEditions, setArchivedEditions] = useState<ArchivedEdition[]>([]);
   const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [account, setAccount] = useState<AccountIdentity | null>(null);
+  const [accountSyncLoading, setAccountSyncLoading] = useState(false);
+  const [accountSyncError, setAccountSyncError] = useState<string | null>(null);
+  const [pendingMigration, setPendingMigration] = useState<LocalMigration | null>(null);
+  const accountIdRef = useRef<string | null>(null);
+  const cloudReadyRef = useRef(false);
+  const cloudWritesAllowedRef = useRef(false);
+  const cloudInitialSaveForRef = useRef<string | null>(null);
+  const profileWriteQueue = useRef<Promise<void>>(Promise.resolve());
+  const editionWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const [readingProfileError, setReadingProfileError] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const isRtl = lang === "ur";
+
+  const saveCloudProfile = useCallback((profile: ReadingProfileValue) => {
+    if (!accountIdRef.current || !cloudReadyRef.current || !cloudWritesAllowedRef.current) return;
+    const expectedAccountId = accountIdRef.current;
+    profileWriteQueue.current = profileWriteQueue.current.then(async () => {
+      if (accountIdRef.current !== expectedAccountId) return;
+      const response = await fetch("/api/account/profile", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile), cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Your account profile could not be synced.");
+      setAccountSyncError(null);
+    }).catch((cause: unknown) => {
+      if (accountIdRef.current === expectedAccountId) setAccountSyncError(cause instanceof Error ? cause.message : "Your account profile could not be synced.");
+    });
+  }, []);
 
   const saveCurrentEdition = useCallback((nextArticles: Article[]) => {
     if (!preferencesLoaded) return;
@@ -103,6 +148,23 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     });
     setArchivedEditions(result.editions);
     setArchiveError(result.error);
+    if (accountIdRef.current && cloudReadyRef.current && cloudWritesAllowedRef.current) {
+      const expectedAccountId = accountIdRef.current;
+      const snapshot = result.editions.find((edition) => edition.id === `subah-${editionDate}`) ?? result.editions[0];
+      if (snapshot) {
+        editionWriteQueue.current = editionWriteQueue.current.then(async () => {
+          if (accountIdRef.current !== expectedAccountId) return;
+          const response = await fetch("/api/account/editions", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(snapshot), cache: "no-store",
+          });
+          if (!response.ok) throw new Error("This edition could not be synced to your account.");
+          setAccountSyncError(null);
+        }).catch((cause: unknown) => {
+          if (accountIdRef.current === expectedAccountId) setAccountSyncError(cause instanceof Error ? cause.message : "This edition could not be synced to your account.");
+        });
+      }
+    }
   }, [editionNow, preferencesLoaded]);
 
   const loadNews = useCallback(async (refresh = false) => {
@@ -150,6 +212,86 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     return () => window.clearTimeout(restore);
   }, []);
 
+  const handleAccountChange = useCallback((identity: AccountIdentity | null) => {
+    if (identity?.id === accountIdRef.current) {
+      setAccount(identity);
+      return;
+    }
+    accountIdRef.current = identity?.id ?? null;
+    cloudReadyRef.current = false;
+    cloudWritesAllowedRef.current = false;
+    cloudInitialSaveForRef.current = null;
+    setAccount(identity);
+    setPendingMigration(null);
+    setAccountSyncError(null);
+    setAccountSyncLoading(Boolean(identity));
+    if (!identity) {
+      cloudReadyRef.current = false;
+      setAccountSyncLoading(false);
+      const localProfile = readReadingProfile();
+      readingProfileRef.current = localProfile;
+      setReadingProfile(localProfile);
+      setArchivedEditions(readArchivedEditions());
+    }
+  }, []);
+
+  useEffect(() => {
+    const accountId = account?.id;
+    if (!accountId) return;
+    const controller = new AbortController();
+
+    async function loadAccountData() {
+      try {
+        const [profileResponse, editionsResponse] = await Promise.all([
+          fetch("/api/account/profile", { cache: "no-store", signal: controller.signal }),
+          fetch("/api/account/editions", { cache: "no-store", signal: controller.signal }),
+        ]);
+        const [profileBody, editionsBody] = await Promise.all([
+          profileResponse.json() as Promise<{ profile?: unknown; error?: string }>,
+          editionsResponse.json() as Promise<{ editions?: unknown; error?: string }>,
+        ]);
+        if (!profileResponse.ok || !editionsResponse.ok) {
+          throw new Error(profileBody.error || editionsBody.error || "Account data could not be loaded.");
+        }
+
+        const cloudProfile = profileBody.profile === null || profileBody.profile === undefined
+          ? EMPTY_READING_PROFILE
+          : normalizeReadingProfile(profileBody.profile);
+        const remoteEditions = Array.isArray(editionsBody.editions)
+          ? editionsBody.editions.map(migrateArchivedEdition).filter((item): item is ArchivedEdition => item !== null)
+          : [];
+        const localProfile = readReadingProfile();
+        const localEditions = readArchivedEditions();
+        const profileNeedsImport = (localProfile.regions.length > 0 || localProfile.subjects.length > 0) &&
+          JSON.stringify(localProfile) !== JSON.stringify(cloudProfile);
+        const localEditionsNeedingImport = localEditions.filter((localEdition) => {
+          const cloudEdition = remoteEditions.find((edition) => edition.id === localEdition.id);
+          return !cloudEdition || stableSerialize(cloudEdition) !== stableSerialize(localEdition);
+        });
+        const migration = profileNeedsImport || localEditionsNeedingImport.length > 0
+          ? { profile: profileNeedsImport ? localProfile : null, editions: localEditionsNeedingImport }
+          : null;
+
+        if (accountIdRef.current !== accountId || controller.signal.aborted) return;
+        readingProfileRef.current = cloudProfile;
+        setReadingProfile(cloudProfile);
+        setArchivedEditions(mergeEditionLists(remoteEditions, localEditions));
+        setPendingMigration(migration);
+        cloudReadyRef.current = true;
+        cloudWritesAllowedRef.current = migration === null;
+        setAccountSyncLoading(false);
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        setAccountSyncError(cause instanceof Error ? cause.message : "Account data could not be loaded.");
+        setArchivedEditions(readArchivedEditions());
+        setAccountSyncLoading(false);
+      }
+    }
+
+    void loadAccountData();
+    return () => controller.abort();
+  }, [account?.id]);
+
   useEffect(() => {
     const restore = window.setTimeout(() => {
       try {
@@ -193,11 +335,19 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     setReadingProfile(profile);
     if (!saveReadingProfile(profile)) setReadingProfileError("This browser could not save your reading profile.");
     else setReadingProfileError(null);
+    const profileHasSelections = profile.regions.length > 0 || profile.subjects.length > 0;
+    if (pendingMigration && !profileHasSelections && pendingMigration.editions.length === 0) {
+      cloudWritesAllowedRef.current = true;
+      setPendingMigration(null);
+    } else if (pendingMigration) {
+      setPendingMigration((current) => current ? { ...current, profile: profileHasSelections ? profile : null } : current);
+    }
+    saveCloudProfile(profile);
     if (articles.length) {
       const filtered = deduplicateEditionArticles(filterArticles(articles, selectedRegionsRef.current, selectedSubjectsRef.current));
       saveCurrentEdition(forYouRef.current ? rankArticlesForProfile(filtered, profile) : filtered);
     }
-  }, [articles, saveCurrentEdition]);
+  }, [articles, pendingMigration, saveCloudProfile, saveCurrentEdition]);
 
   const handleForYouChange = useCallback((enabled: boolean) => {
     forYouRef.current = enabled;
@@ -214,10 +364,66 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     setReadingProfile(profile);
     if (!clearReadingProfile()) setReadingProfileError("This browser could not reset your reading profile.");
     else setReadingProfileError(null);
+    if (pendingMigration && pendingMigration.editions.length === 0) {
+      cloudWritesAllowedRef.current = true;
+      setPendingMigration(null);
+    } else if (pendingMigration) {
+      setPendingMigration((current) => current ? { ...current, profile: null } : current);
+    }
+    saveCloudProfile(profile);
     if (articles.length && forYouRef.current) {
       saveCurrentEdition(deduplicateEditionArticles(filterArticles(articles, selectedRegionsRef.current, selectedSubjectsRef.current)));
     }
-  }, [articles, saveCurrentEdition]);
+  }, [articles, pendingMigration, saveCloudProfile, saveCurrentEdition]);
+
+  const keepCloudData = useCallback(() => {
+    cloudWritesAllowedRef.current = true;
+    cloudInitialSaveForRef.current = null;
+    setPendingMigration(null);
+    setAccountSyncError(null);
+  }, []);
+
+  const importLocalData = useCallback(async () => {
+    if (!pendingMigration || !accountIdRef.current) return;
+    const expectedAccountId = accountIdRef.current;
+    setAccountSyncLoading(true);
+    setAccountSyncError(null);
+    cloudWritesAllowedRef.current = false;
+    try {
+      if (pendingMigration.profile) {
+        if (accountIdRef.current !== expectedAccountId) return;
+        const response = await fetch("/api/account/profile", {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pendingMigration.profile), cache: "no-store",
+        });
+        if (!response.ok) throw new Error("The local reading profile could not be imported.");
+        readingProfileRef.current = pendingMigration.profile;
+        setReadingProfile(pendingMigration.profile);
+      }
+      for (const edition of pendingMigration.editions) {
+        if (accountIdRef.current !== expectedAccountId) return;
+        const response = await fetch("/api/account/editions", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(edition), cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Some local editions could not be imported. Your browser copies remain intact.");
+      }
+      if (accountIdRef.current !== expectedAccountId) return;
+      const response = await fetch("/api/account/editions", { cache: "no-store" });
+      if (!response.ok) throw new Error("The imported editions could not be reloaded.");
+      const body = await response.json() as { editions?: unknown };
+      const remote = Array.isArray(body.editions) ? body.editions.map(migrateArchivedEdition).filter((item): item is ArchivedEdition => item !== null) : [];
+      setArchivedEditions(mergeEditionLists(remote, readArchivedEditions()));
+      cloudInitialSaveForRef.current = accountIdRef.current;
+      cloudWritesAllowedRef.current = true;
+      setPendingMigration(null);
+      setAccountSyncError(null);
+    } catch (cause) {
+      setAccountSyncError(cause instanceof Error ? cause.message : "Local data could not be imported.");
+    } finally {
+      setAccountSyncLoading(false);
+    }
+  }, [pendingMigration]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadNews(), 0);
@@ -241,6 +447,16 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     : "";
 
   const sections = groupEditionArticles(displayArticles, lead?.id ?? null);
+
+  useEffect(() => {
+    if (!account?.id || accountSyncLoading || pendingMigration || accountSyncError || !cloudReadyRef.current ||
+      !cloudWritesAllowedRef.current || !preferencesLoaded || displayArticles.length === 0 ||
+      cloudInitialSaveForRef.current === account.id) return;
+    cloudInitialSaveForRef.current = account.id;
+    saveCurrentEdition(displayArticles);
+  }, [account?.id, accountSyncLoading, accountSyncError, pendingMigration, preferencesLoaded, displayArticles, saveCurrentEdition]);
+
+  const archiveSyncStatus = !account ? "local" : accountSyncLoading ? "syncing" : pendingMigration ? "migration" : accountSyncError ? "local" : "synced";
 
   const handleDownloadCurrentPdf = async () => {
     setPdfError(null);
@@ -290,6 +506,18 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
                 {lang === "ur" ? "اپنی پسندیدہ موضوعات منتخب کریں اور اپنا اخبار ذاتی بنائیں۔" : "Select topics you care about to personalise your edition."}
               </p>
             </div>
+            <AccountAuth lang={lang} onAuthChange={handleAccountChange} />
+            {accountSyncLoading && <p className="subah-filter-help" role="status">{lang === "ur" ? "اکاؤنٹ ڈیٹا لوڈ ہو رہا ہے…" : "Loading your account data…"}</p>}
+            {accountSyncError && <p className="subah-profile-error" role="alert">{accountSyncError}</p>}
+            {pendingMigration && <div className="subah-account-migration" role="group" aria-label={lang === "ur" ? "مقامی ڈیٹا کی منتقلی" : "Local data migration"}>
+              <p>{lang === "ur"
+                ? `اس براؤزر میں ${pendingMigration.editions.length} ایڈیشن${pendingMigration.profile ? " اور ایک مطالعہ پروفائل" : ""} موجود ہیں۔ یہ ڈیٹا حذف نہیں ہوگا۔ کیا آپ اسے اپنے اکاؤنٹ میں درآمد کرنا چاہتے ہیں؟`
+                : `This browser has ${pendingMigration.editions.length} saved edition${pendingMigration.editions.length === 1 ? "" : "s"}${pendingMigration.profile ? " and a reading profile" : ""}. Local copies will remain. Import them into this account?`}</p>
+              <div className="subah-account__tabs">
+                <button type="button" className="subah-btn subah-btn--primary" disabled={accountSyncLoading} onClick={() => void importLocalData()}>{lang === "ur" ? "مقامی ڈیٹا درآمد کریں" : "Import local data"}</button>
+                <button type="button" className="subah-btn subah-btn--outline" disabled={accountSyncLoading} onClick={keepCloudData}>{lang === "ur" ? "اکاؤنٹ کا ڈیٹا رکھیں" : "Keep account data"}</button>
+              </div>
+            </div>}
             <TopicSelector selectedRegions={selectedRegions} selectedSubjects={selectedSubjects} onChange={handleFiltersChange} lang={lang} />
             <ReadingProfile profile={readingProfile} onChange={handleProfileChange} onReset={handleProfileReset} forYou={forYou} onForYouChange={handleForYouChange} storageError={readingProfileError} lang={lang} />
           </section>
@@ -369,6 +597,8 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
         editions={archivedEditions}
         lang={lang}
         storageError={archiveError}
+        accountError={accountSyncError}
+        syncStatus={archiveSyncStatus}
         onClose={() => setArchiveOpen(false)}
         onDownload={handleDownloadArchivedPdf}
       />
