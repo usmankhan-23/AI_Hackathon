@@ -10,13 +10,13 @@ interface TopicSelectorProps {
   lang: Lang;
 }
 
-const REGION_UR: Record<RegionKey, string> = {
+export const REGION_UR: Record<RegionKey, string> = {
   Pakistan: "پاکستان", "South Asia": "جنوبی ایشیا", "East Asia": "مشرقی ایشیا",
   "Southeast Asia": "جنوب مشرقی ایشیا", "Middle East & North Africa": "مشرق وسطیٰ اور شمالی افریقہ",
   Europe: "یورپ", Africa: "افریقہ", "North America": "شمالی امریکہ",
   "Latin America": "لاطینی امریکہ", Oceania: "اوشینیا", Global: "عالمی",
 };
-const SUBJECT_UR: Record<SubjectKey, string> = {
+export const SUBJECT_UR: Record<SubjectKey, string> = {
   "Artificial Intelligence": "مصنوعی ذہانت", Technology: "ٹیکنالوجی",
   "Politics & Government": "سیاست اور حکومت", "Business & Economy": "کاروبار اور معیشت",
   Sports: "کھیل", Science: "سائنس", "Health & Medicine": "صحت اور طب",

@@ -9,6 +9,7 @@ interface ArticleCardProps {
   article: Article;
   lang: Lang;
   editionNow: string;
+  whyThisStory?: string | null;
 }
 
 /**
@@ -28,7 +29,7 @@ function formatRelativeTime(iso: string, editionNow: string, lang: Lang): string
   return `${mins}m ago`;
 }
 
-export default function ArticleCard({ article, lang, editionNow }: ArticleCardProps) {
+export default function ArticleCard({ article, lang, editionNow, whyThisStory }: ArticleCardProps) {
   const [liked, setLiked] = useState(false);
   const [skipped, setSkipped] = useState(false);
 
@@ -92,6 +93,10 @@ export default function ArticleCard({ article, lang, editionNow }: ArticleCardPr
       <p className="subah-card__summary" lang="en" dir="ltr">
         {article.summary}
       </p>
+
+      {whyThisStory && <p className="subah-card__why" lang={lang} dir={lang === "ur" ? "rtl" : "ltr"}>
+        <strong>{lang === "ur" ? "یہ خبر کیوں؟" : "Why this story?"}</strong> {whyThisStory}
+      </p>}
 
       <div className="subah-card__tags">
         {article.topics.map((t) => (

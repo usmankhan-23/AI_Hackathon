@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Masthead from "@/components/Masthead";
-import TopicSelector from "@/components/TopicSelector";
+import TopicSelector, { REGION_UR, SUBJECT_UR } from "@/components/TopicSelector";
 import LeadStory from "@/components/LeadStory";
 import ArticleCard from "@/components/ArticleCard";
 import AskSubah from "@/components/AskSubah";
 import EditionActions from "@/components/EditionActions";
 import EditionArchive from "@/components/EditionArchive";
+import ReadingProfile from "@/components/ReadingProfile";
 import { Article, REGIONS, SUBJECTS, type RegionKey, type SubjectKey } from "@/lib/data";
 import {
   ArchivedEdition,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/edition-archive";
 import { downloadEditionPdf } from "@/lib/edition-pdf";
 import { filterArticles, normalizeArticleTaxonomy } from "@/lib/news-classification";
+import { clearReadingProfile, EMPTY_READING_PROFILE, getProfileMatches, rankArticlesForProfile, readReadingProfile, saveReadingProfile, type ReadingProfile as ReadingProfileValue } from "@/lib/reading-intelligence";
 
 const PREFERENCES_KEY = "subah:filters:v1";
 
@@ -62,6 +64,10 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
   const [lang, setLang] = useState<Lang>("en");
   const [selectedRegions, setSelectedRegions] = useState<RegionKey[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<SubjectKey[]>([]);
+  const [readingProfile, setReadingProfile] = useState<ReadingProfileValue>(EMPTY_READING_PROFILE);
+  const [forYou, setForYou] = useState(false);
+  const readingProfileRef = useRef<ReadingProfileValue>(EMPTY_READING_PROFILE);
+  const forYouRef = useRef(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const selectedRegionsRef = useRef<RegionKey[]>([]);
   const selectedSubjectsRef = useRef<SubjectKey[]>([]);
@@ -72,6 +78,7 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
   const [error, setError] = useState<string | null>(null);
   const [archivedEditions, setArchivedEditions] = useState<ArchivedEdition[]>([]);
   const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [readingProfileError, setReadingProfileError] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -80,10 +87,11 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
 
   const saveCurrentEdition = useCallback((nextArticles: Article[]) => {
     if (!preferencesLoaded) return;
-    const snapshotArticles = deduplicateEditionArticles(filterArticles(nextArticles, selectedRegionsRef.current, selectedSubjectsRef.current));
+    const snapshotArticles = deduplicateEditionArticles(nextArticles);
     const editionDate = editionDateInKarachi(editionNow);
-    const leadArticleId = [...snapshotArticles]
-      .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0]?.id ?? null;
+    const leadArticleId = (forYouRef.current
+      ? snapshotArticles[0]
+      : [...snapshotArticles].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0])?.id ?? null;
     const result = saveEditionSnapshot({
       id: `subah-${editionDate}`,
       editionDate,
@@ -113,7 +121,8 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
       if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : "News could not be loaded.");
       const normalizedArticles = body.articles.map(normalizeArticleTaxonomy);
       setArticles(normalizedArticles);
-      saveCurrentEdition(normalizedArticles);
+      const filtered = deduplicateEditionArticles(filterArticles(normalizedArticles, selectedRegionsRef.current, selectedSubjectsRef.current));
+      saveCurrentEdition(forYouRef.current ? rankArticlesForProfile(filtered, readingProfileRef.current) : filtered);
     } catch (cause) {
       if (controller.signal.aborted) return;
       const message = cause instanceof Error ? cause.message : "News could not be loaded.";
@@ -130,6 +139,15 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
   useEffect(() => {
     const loadArchive = window.setTimeout(() => setArchivedEditions(readArchivedEditions()), 0);
     return () => window.clearTimeout(loadArchive);
+  }, []);
+
+  useEffect(() => {
+    const restore = window.setTimeout(() => {
+      const profile = readReadingProfile();
+      readingProfileRef.current = profile;
+      setReadingProfile(profile);
+    }, 0);
+    return () => window.clearTimeout(restore);
   }, []);
 
   useEffect(() => {
@@ -164,7 +182,41 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
       else window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ regions, subjects }));
       setArchiveError(null);
     } catch { setArchiveError("This browser could not save your filter preferences."); }
-    if (articles.length) saveCurrentEdition(articles);
+    if (articles.length) {
+      const filtered = deduplicateEditionArticles(filterArticles(articles, regions, subjects));
+      saveCurrentEdition(forYouRef.current ? rankArticlesForProfile(filtered, readingProfileRef.current) : filtered);
+    }
+  }, [articles, saveCurrentEdition]);
+
+  const handleProfileChange = useCallback((profile: ReadingProfileValue) => {
+    readingProfileRef.current = profile;
+    setReadingProfile(profile);
+    if (!saveReadingProfile(profile)) setReadingProfileError("This browser could not save your reading profile.");
+    else setReadingProfileError(null);
+    if (articles.length) {
+      const filtered = deduplicateEditionArticles(filterArticles(articles, selectedRegionsRef.current, selectedSubjectsRef.current));
+      saveCurrentEdition(forYouRef.current ? rankArticlesForProfile(filtered, profile) : filtered);
+    }
+  }, [articles, saveCurrentEdition]);
+
+  const handleForYouChange = useCallback((enabled: boolean) => {
+    forYouRef.current = enabled;
+    setForYou(enabled);
+    if (articles.length) {
+      const filtered = deduplicateEditionArticles(filterArticles(articles, selectedRegionsRef.current, selectedSubjectsRef.current));
+      saveCurrentEdition(enabled ? rankArticlesForProfile(filtered, readingProfileRef.current) : filtered);
+    }
+  }, [articles, saveCurrentEdition]);
+
+  const handleProfileReset = useCallback(() => {
+    const profile = { ...EMPTY_READING_PROFILE };
+    readingProfileRef.current = profile;
+    setReadingProfile(profile);
+    if (!clearReadingProfile()) setReadingProfileError("This browser could not reset your reading profile.");
+    else setReadingProfileError(null);
+    if (articles.length && forYouRef.current) {
+      saveCurrentEdition(deduplicateEditionArticles(filterArticles(articles, selectedRegionsRef.current, selectedSubjectsRef.current)));
+    }
   }, [articles, saveCurrentEdition]);
 
   useEffect(() => {
@@ -175,14 +227,18 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
     };
   }, [loadNews]);
 
-  const displayArticles = deduplicateEditionArticles(filterArticles(articles, selectedRegions, selectedSubjects));
-  const lead = [...displayArticles]
+  const filteredArticles = deduplicateEditionArticles(filterArticles(articles, selectedRegions, selectedSubjects));
+  const displayArticles = forYou ? rankArticlesForProfile(filteredArticles, readingProfile) : filteredArticles;
+  const lead = (forYou ? displayArticles : [...displayArticles]
     .filter((article) => Number.isFinite(Date.parse(article.publishedAt)))
-    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))[0];
-  const leadMatches = lead ? [...lead.topics.filter((topic) => selectedSubjects.includes(topic)), ...lead.regions.filter((region) => selectedRegions.includes(region))] : [];
-  const matchReason = leadMatches.length
-    ? (lang === "ur" ? `آپ کی دلچسپی کے موضوعات: ${leadMatches.join("، ")}` : `Matches your interests in ${leadMatches.join(" and ")}.`)
-    : (lang === "ur" ? `${lead?.sourceName ?? ""} سے تازہ خبر` : `Latest from ${lead?.sourceName ?? "the publisher"}.`);
+    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt)))[0];
+  const leadMatches = lead ? getProfileMatches(lead, readingProfile) : { subjects: [], regions: [] };
+  const matchedNames = [...leadMatches.subjects.map((item) => lang === "ur" ? SUBJECT_UR[item] : item), ...leadMatches.regions.map((item) => lang === "ur" ? REGION_UR[item] : item)];
+  const matchReason = lead && matchedNames.length
+    ? (lang === "ur"
+      ? `آپ کی پسند سے مطابقت: ${matchedNames.join("، ")}`
+      : `Matches your preferred ${matchedNames.join(" and ")}.`)
+    : "";
 
   const sections = groupEditionArticles(displayArticles, lead?.id ?? null);
 
@@ -235,6 +291,7 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
               </p>
             </div>
             <TopicSelector selectedRegions={selectedRegions} selectedSubjects={selectedSubjects} onChange={handleFiltersChange} lang={lang} />
+            <ReadingProfile profile={readingProfile} onChange={handleProfileChange} onReset={handleProfileReset} forYou={forYou} onForYouChange={handleForYouChange} storageError={readingProfileError} lang={lang} />
           </section>
 
           <div className="subah-rule" role="separator" />
@@ -275,7 +332,14 @@ export default function HomeClient({ editionNow }: { editionNow: string }) {
                 <section key={section.id} className="subah-section" id={section.id} aria-label={section.label[lang]} lang={lang} dir={isRtl ? "rtl" : "ltr"}>
                   <h2 className="subah-section__title subah-section__title--ruled">{section.label[lang]}</h2>
                   <div className="subah-cards-grid">
-                    {section.articles.map((article) => <ArticleCard key={article.id} article={article} lang={lang} editionNow={editionNow} />)}
+                    {section.articles.map((article) => {
+                      const matches = getProfileMatches(article, readingProfile);
+                      const names = [...matches.subjects.map((item) => lang === "ur" ? SUBJECT_UR[item] : item), ...matches.regions.map((item) => lang === "ur" ? REGION_UR[item] : item)];
+                      const whyThisStory = names.length
+                        ? lang === "ur" ? `آپ کی پسند سے مطابقت: ${names.join("، ")}` : `Matches your preferred ${names.join(" and ")}.`
+                        : null;
+                      return <ArticleCard key={article.id} article={article} lang={lang} editionNow={editionNow} whyThisStory={whyThisStory} />;
+                    })}
                   </div>
                 </section>
               ))}

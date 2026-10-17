@@ -6,7 +6,7 @@ type Lang = "en" | "ur";
 
 interface LeadStoryProps {
   article: Article;
-  matchReason: string;
+  matchReason?: string;
   lang: Lang;
 }
 
@@ -78,10 +78,10 @@ export default function LeadStory({ article, matchReason, lang }: LeadStoryProps
         </span>
       </div>
 
-      <div className="subah-lead__match">
+      {matchReason && <div className="subah-lead__match">
         <span className="subah-match-icon" aria-hidden="true">✦</span>
         {matchReason}
-      </div>
+      </div>}
 
       <div className="subah-lead__actions">
         <a
