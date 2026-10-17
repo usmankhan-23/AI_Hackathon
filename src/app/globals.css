@@ -1,26 +1,926 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUBAH — Design System
+   Newspaper-inspired editorial interface, Stage 1
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Custom properties ─────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Palette */
+  --ivory:        #faf8f3;
+  --ivory-dark:   #f2ede2;
+  --ink:          #1a1710;
+  --ink-mid:      #3d3a30;
+  --ink-light:    #6b6455;
+  --ink-faint:    #9c9282;
+  --gold:         #b89a3e;
+  --gold-light:   #d4b55a;
+  --gold-pale:    #f5eec6;
+  --rule:         #d6cdb8;
+  --rule-heavy:   #8a7e68;
+  --white:        #ffffff;
+  --liked-red:    #b03030;
+
+  /* Typography */
+  --font-serif:   "Georgia", "Times New Roman", serif;
+  --font-sans:    var(--font-geist-sans, "Helvetica Neue", Arial, sans-serif);
+  --font-mono:    var(--font-geist-mono, "Courier New", monospace);
+
+  /* Spacing scale */
+  --space-xs:     0.25rem;
+  --space-sm:     0.5rem;
+  --space-md:     1rem;
+  --space-lg:     1.5rem;
+  --space-xl:     2rem;
+  --space-2xl:    3rem;
+
+  /* Layout */
+  --max-width:    1200px;
+  --sidebar-w:    280px;
+
+  /* Existing tokens (kept) */
+  --background:   var(--ivory);
+  --foreground:   var(--ink);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ─── Base reset ────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--ivory);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  min-height: 100dvh;
+}
+
+/* ─── Root wrapper ──────────────────────────────────────────────────────── */
+
+.subah-root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Masthead ──────────────────────────────────────────────────────────── */
+
+.subah-masthead {
+  background: var(--ivory);
+  border-bottom: 3px double var(--ink);
+  padding: var(--space-md) var(--space-xl);
+}
+
+.subah-masthead__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+}
+
+.subah-masthead__date {
+  font-family: var(--font-sans);
+}
+
+/* Language selector */
+.subah-lang-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.subah-lang-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  padding: 2px 6px;
+  border-radius: 2px;
+  transition: color 0.15s, background 0.15s;
+  font-family: var(--font-sans);
+}
+
+.subah-lang-btn:hover {
+  color: var(--ink);
+  background: var(--ivory-dark);
+}
+
+.subah-lang-btn--active {
+  color: var(--ink);
+  font-weight: 700;
+  background: var(--ivory-dark);
+}
+
+.subah-lang-divider {
+  color: var(--rule);
+}
+
+/* Nameplate */
+.subah-nameplate {
+  text-align: center;
+  padding: var(--space-lg) 0 var(--space-md);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: var(--space-sm);
+}
+
+.subah-logo {
+  font-family: var(--font-serif);
+  font-size: clamp(2.8rem, 8vw, 5.5rem);
+  font-weight: 400;
+  letter-spacing: 0.25em;
+  color: var(--ink);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.subah-tagline {
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  color: var(--ink-light);
+  text-transform: uppercase;
+  margin-top: var(--space-xs);
+}
+
+/* Nav */
+.subah-nav {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-xl);
+  padding-top: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.subah-nav__link {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.subah-nav__link:hover,
+.subah-nav__link:focus-visible {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+  outline: none;
+}
+
+/* ─── Layout ────────────────────────────────────────────────────────────── */
+
+.subah-layout {
+  display: grid;
+  grid-template-columns: 1fr var(--sidebar-w);
+  grid-template-areas: "main sidebar";
+  gap: var(--space-xl);
+  max-width: var(--max-width);
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  flex: 1;
+}
+
+.subah-main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.subah-sidebar {
+  grid-area: sidebar;
+}
+
+/* ─── Dividers ──────────────────────────────────────────────────────────── */
+
+.subah-rule {
+  height: 1px;
+  background: var(--rule);
+  margin: var(--space-xl) 0;
+}
+
+/* ─── Sections ──────────────────────────────────────────────────────────── */
+
+.subah-section {
+  margin-bottom: var(--space-xl);
+}
+
+.subah-section__heading {
+  margin-bottom: var(--space-lg);
+}
+
+.subah-section__title {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.subah-section__title--ruled {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  padding-bottom: var(--space-sm);
+  border-bottom: 2px solid var(--ink-mid);
+  margin-bottom: var(--space-lg);
+}
+
+.subah-section__subtitle {
+  color: var(--ink-light);
+  font-size: 0.9rem;
+  margin-top: var(--space-xs);
+}
+
+.subah-section-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink-faint);
+  display: block;
+  margin-bottom: var(--space-sm);
+}
+
+/* ─── Topic chips ───────────────────────────────────────────────────────── */
+
+.subah-topic-selector {
+  margin-top: var(--space-md);
+}
+
+.subah-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.subah-chip {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.3rem 0.8rem;
+  border-radius: 2px;
+  border: 1.5px solid var(--rule-heavy);
+  background: var(--white);
+  color: var(--ink-mid);
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.subah-chip:hover {
+  background: var(--ivory-dark);
+  border-color: var(--ink-mid);
+  color: var(--ink);
+}
+
+.subah-chip--active {
+  background: var(--ink);
+  color: var(--ivory);
+  border-color: var(--ink);
+}
+
+.subah-chip--active:hover {
+  background: var(--ink-mid);
+  color: var(--ivory);
+}
+
+.subah-chip-summary {
+  font-size: 0.82rem;
+  color: var(--ink-light);
+  font-style: italic;
+  margin-top: var(--space-xs);
+}
+
+/* ─── Lead story ────────────────────────────────────────────────────────── */
+
+.subah-lead {
+  padding: var(--space-lg) 0;
+}
+
+.subah-lead__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.subah-lead__label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: var(--gold-pale);
+  padding: 3px 8px;
+  border-left: 3px solid var(--gold);
+}
+
+.subah-lead__title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.7rem, 3.5vw, 2.4rem);
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--ink);
+  margin-bottom: var(--space-md);
+  max-width: 780px;
+}
+
+.subah-lead__summary {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--ink-mid);
+  max-width: 680px;
+  margin-bottom: var(--space-md);
+  border-left: 3px solid var(--rule);
+  padding-left: var(--space-md);
+}
+
+.subah-lead__meta {
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+}
+
+.subah-lead__source {
+  font-weight: 600;
+  color: var(--ink-mid);
+}
+
+.subah-lead__match {
+  font-size: 0.82rem;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+  font-style: italic;
+}
+
+.subah-match-icon {
+  font-size: 0.7rem;
+}
+
+.subah-lead__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+/* ─── Tags ──────────────────────────────────────────────────────────────── */
+
+.subah-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  border: 1px solid var(--rule);
+  padding: 2px 6px;
+  border-radius: 1px;
+}
+
+.subah-tag--lead {
+  color: var(--gold);
+  border-color: var(--gold-light);
+  background: var(--gold-pale);
+}
+
+/* ─── Buttons ───────────────────────────────────────────────────────────── */
+
+.subah-btn {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.55rem 1.2rem;
+  border-radius: 2px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.subah-btn--primary {
+  background: var(--ink);
+  color: var(--ivory);
+  border-color: var(--ink);
+}
+
+.subah-btn--primary:hover,
+.subah-btn--primary:focus-visible {
+  background: var(--ink-mid);
+  border-color: var(--ink-mid);
+  outline: none;
+}
+
+.subah-btn--primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.subah-btn--outline {
+  background: transparent;
+  color: var(--ink-mid);
+  border-color: var(--rule-heavy);
+  width: 100%;
+  justify-content: center;
+}
+
+.subah-btn--outline:hover,
+.subah-btn--outline:focus-visible {
+  background: var(--ivory-dark);
+  border-color: var(--ink-mid);
+  outline: none;
+}
+
+/* Demo-only button: visually indicates the link is a placeholder */
+.subah-btn--demo {
+  opacity: 0.8;
+  cursor: default;
+  text-decoration: line-through;
+  text-decoration-color: var(--rule-heavy);
+  text-decoration-thickness: 1px;
+}
+
+.subah-btn--demo:hover,
+.subah-btn--demo:focus-visible {
+  background: var(--ink);
+  border-color: var(--ink);
+  outline: none;
+  opacity: 0.8;
+}
+
+/* ─── Article cards ─────────────────────────────────────────────────────── */
+
+.subah-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-lg);
+}
+
+.subah-card {
+  border-top: 2px solid var(--ink-mid);
+  padding: var(--space-md) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  transition: opacity 0.2s;
+}
+
+.subah-card--liked {
+  border-top-color: var(--liked-red);
+}
+
+.subah-card--dim {
+  opacity: 0.55;
+}
+
+.subah-card--skipped {
+  border-top: 2px solid var(--rule);
+  padding: var(--space-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--ivory-dark);
+}
+
+.subah-skipped-msg {
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.subah-undo-btn {
+  font-size: 0.78rem;
+  color: var(--ink-mid);
+  background: none;
+  border: 1px solid var(--rule);
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+  font-family: var(--font-sans);
+}
+
+.subah-undo-btn:hover {
+  background: var(--white);
+}
+
+.subah-card__meta {
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.subah-card__source {
+  font-weight: 600;
+  color: var(--ink-light);
+}
+
+.subah-card__dot {
+  color: var(--rule);
+  font-size: 0.9em;
+}
+
+.subah-card__title {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.subah-card__summary {
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--ink-mid);
+  flex: 1;
+}
+
+.subah-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.subah-card__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-xs);
+}
+
+.subah-action-btn {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-light);
+  cursor: pointer;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.subah-action-btn:hover,
+.subah-action-btn:focus-visible {
+  background: var(--ivory-dark);
+  color: var(--ink);
+  border-color: var(--ink-mid);
+  outline: none;
+}
+
+.subah-action-btn--liked {
+  color: var(--liked-red);
+  border-color: var(--liked-red);
+  background: #fff0f0;
+}
+
+.subah-action-btn--liked:hover {
+  background: #ffe0e0;
+}
+
+.subah-action-btn--link {
+  color: var(--gold);
+  border-color: var(--gold-light);
+}
+
+.subah-action-btn--link:hover {
+  background: var(--gold-pale);
+  color: var(--ink);
+  border-color: var(--gold);
+}
+
+/* ─── Ask Subah ─────────────────────────────────────────────────────────── */
+
+.subah-ask {
+  background: var(--ivory-dark);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ink);
+  padding: var(--space-xl);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.subah-ask__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.subah-ask__icon {
+  font-size: 1.8rem;
+  color: var(--gold);
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.subah-ask__title {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: var(--space-xs);
+}
+
+.subah-ask__desc {
+  font-size: 0.875rem;
+  color: var(--ink-light);
+  line-height: 1.55;
+}
+
+.subah-ask__form {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.subah-ask__input {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  padding: 0.6rem 0.9rem;
+  border: 1.5px solid var(--rule-heavy);
+  border-radius: 2px;
+  background: var(--white);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.subah-ask__input:focus {
+  border-color: var(--ink);
+}
+
+.subah-ask__input::placeholder {
+  color: var(--ink-faint);
+}
+
+.subah-ask__suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.subah-ask__suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.subah-suggestion-chip {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px dashed var(--rule-heavy);
+  border-radius: 2px;
+  background: var(--white);
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.subah-suggestion-chip:hover,
+.subah-suggestion-chip:focus-visible {
+  background: var(--ivory-dark);
+  border-color: var(--ink-mid);
+  outline: none;
+}
+
+.subah-ask__response {
+  background: var(--white);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--gold);
+  padding: var(--space-md);
+  border-radius: 2px;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--ink-mid);
+}
+
+/* ─── Demo note ─────────────────────────────────────────────────────────── */
+
+.subah-demo-note {
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+/* Content-language notice: shown in Urdu mode to explain English article text */
+.subah-content-lang-note {
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  font-style: italic;
+  border-left: 2px solid var(--rule);
+  padding-left: var(--space-sm);
+  margin-top: calc(-1 * var(--space-xs));
+  margin-bottom: var(--space-xs);
+  direction: rtl;
+  text-align: right;
+}
+
+.subah-content-lang-note--lead {
+  font-size: 0.82rem;
+  border-left: none;
+  border-right: 2px solid var(--rule);
+  padding-left: 0;
+  padding-right: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.subah-demo-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: var(--space-xs);
+}
+
+/* ─── Edition actions sidebar ───────────────────────────────────────────── */
+
+.subah-edition-actions {
+  position: sticky;
+  top: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border-top: 2px solid var(--ink);
+  background: var(--ivory-dark);
+}
+
+.subah-edition-actions__title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.subah-edition-actions__btns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* ─── Footer ────────────────────────────────────────────────────────────── */
+
+.subah-footer {
+  border-top: 3px double var(--ink);
+  text-align: center;
+  padding: var(--space-lg) var(--space-xl);
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+/* ─── Focus ring ────────────────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ─── RTL adjustments ───────────────────────────────────────────────────── */
+
+[dir="rtl"] .subah-lead__summary {
+  border-left: none;
+  border-right: 3px solid var(--rule);
+  padding-left: 0;
+  padding-right: var(--space-md);
+}
+
+[dir="rtl"] .subah-lead__label {
+  border-left: none;
+  border-right: 3px solid var(--gold);
+}
+
+[dir="rtl"] .subah-ask__response {
+  border-left: none;
+  border-right: 4px solid var(--gold);
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .subah-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "main"
+      "sidebar";
+    padding: var(--space-lg);
+  }
+
+  .subah-sidebar {
+    border-top: 1px solid var(--rule);
+    padding-top: var(--space-lg);
+  }
+
+  .subah-edition-actions {
+    position: static;
+  }
+
+  .subah-edition-actions__btns {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .subah-btn--outline {
+    width: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .subah-masthead {
+    padding: var(--space-md);
+  }
+
+  .subah-nav {
+    gap: var(--space-md);
+  }
+
+  .subah-layout {
+    padding: var(--space-md);
+  }
+
+  .subah-logo {
+    letter-spacing: 0.15em;
+  }
+
+  .subah-lead__title {
+    font-size: 1.5rem;
+  }
+
+  .subah-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .subah-ask__form {
+    flex-direction: column;
+  }
+
+  .subah-ask {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .subah-lead__actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ─── Print media ───────────────────────────────────────────────────────── */
+
+@media print {
+  .subah-card__actions,
+  .subah-ask,
+  .subah-edition-actions,
+  .subah-nav {
+    display: none;
+  }
 }
