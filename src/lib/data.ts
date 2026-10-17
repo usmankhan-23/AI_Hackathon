@@ -267,15 +267,10 @@ export const SECTIONS = [
   },
 ] as const;
 
-// ─── Ask Subah demo Q&A ────────────────────────────────────────────────────────
+// ─── Ask Subah example questions ───────────────────────────────────────────────
 
 export const DEMO_SUGGESTIONS: { en: string; ur: string }[] = [
   { en: "What are the top AI stories today?", ur: "آج کی بڑی AI خبریں کیا ہیں؟" },
   { en: "Summarize the Pakistan business news.", ur: "پاکستان کی کاروباری خبروں کا خلاصہ بتائیں۔" },
   { en: "What happened in science this week?", ur: "اس ہفتے سائنس میں کیا ہوا؟" },
 ];
-
-export const DEMO_AI_RESPONSE = {
-  en: "📌 This is a demo response. The Ask Subah feature will connect to a news-aware AI model in a future stage of development. Your question has been noted.",
-  ur: "📌 یہ ایک ڈیمو جواب ہے۔ 'سوال کریں سُبح سے' فیچر آئندہ مرحلے میں AI سے جڑ جائے گا۔ آپ کا سوال محفوظ کر لیا گیا ہے۔",
-};
