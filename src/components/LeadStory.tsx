@@ -84,27 +84,16 @@ export default function LeadStory({ article, matchReason, lang }: LeadStoryProps
       </div>
 
       <div className="subah-lead__actions">
-        {/*
-         * The lead story source URL is "#demo-lead-source" — a clearly
-         * labeled placeholder. The button is intentionally non-functional
-         * in this demo stage. The note below makes this explicit.
-         */}
         <a
           href={article.sourceUrl}
-          className="subah-btn subah-btn--primary subah-btn--demo"
-          aria-label={`[Demo] ${article.title}`}
-          aria-disabled="true"
-          role="button"
-          tabIndex={0}
+          className="subah-btn subah-btn--primary"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${lang === "ur" ? "اصل خبر کھولیں" : "Open original story"}: ${article.title}`}
         >
           {lang === "ur" ? "مکمل مضمون پڑھیں" : "Read Full Story"}
           <span aria-hidden="true"> ↗</span>
         </a>
-        <span className="subah-demo-note">
-          {lang === "ur"
-            ? "⚠ ڈیمو لنک — یہ کوئی حقیقی اخبار کا صفحہ نہیں۔"
-            : "⚠ Demo link — not a real publisher page."}
-        </span>
       </div>
     </section>
   );

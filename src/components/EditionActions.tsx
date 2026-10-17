@@ -4,9 +4,11 @@ type Lang = "en" | "ur";
 
 interface EditionActionsProps {
   lang: Lang;
+  onRefresh: () => void;
+  refreshing: boolean;
 }
 
-export default function EditionActions({ lang }: EditionActionsProps) {
+export default function EditionActions({ lang, onRefresh, refreshing }: EditionActionsProps) {
   const placeholder = (action: string) => {
     alert(
       lang === "ur"
@@ -43,19 +45,18 @@ export default function EditionActions({ lang }: EditionActionsProps) {
         </button>
         <button
           className="subah-btn subah-btn--outline"
-          onClick={() =>
-            placeholder(lang === "ur" ? "ایڈیشن تازہ کریں" : "Refresh edition")
-          }
-          aria-label={lang === "ur" ? "ایڈیشن دوبارہ بنائیں" : "Refresh or regenerate edition"}
+          onClick={onRefresh}
+          disabled={refreshing}
+          aria-label={lang === "ur" ? "خبریں تازہ کریں" : "Refresh news"}
         >
           <span aria-hidden="true">↻</span>
-          {lang === "ur" ? "تازہ کریں" : "Refresh"}
+          {refreshing ? (lang === "ur" ? "تازہ ہو رہا ہے…" : "Refreshing…") : (lang === "ur" ? "تازہ کریں" : "Refresh")}
         </button>
       </div>
       <p className="subah-demo-note">
         {lang === "ur"
-          ? "یہ کنٹرول ابھی ڈیمو حالت میں ہیں اور آئندہ مرحلے میں فعال ہوں گے۔"
-          : "These controls are placeholders and will be activated in a future stage."}
+          ? "PDF اور آرکائیو کے کنٹرول ابھی ڈیمو ہیں۔"
+          : "PDF download and archive controls are still demos."}
       </p>
     </aside>
   );

@@ -1,5 +1,6 @@
 import { NEWS_FEEDS } from "@/lib/news-feeds";
 import { collectNews } from "@/lib/news-ingestion";
+import { revalidateTag } from "next/cache";
 
 /**
  * Returns { updatedAt, articles, sources }, where each source has id, name,
@@ -7,7 +8,12 @@ import { collectNews } from "@/lib/news-ingestion";
  * means no usable publisher excerpt was provided; readingMinutes is 0 when no
  * estimate can be made from source text.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const refreshRequested = new URL(request.url).searchParams.get("refresh") === "1";
+  if (refreshRequested) {
+    revalidateTag("news-rss-feeds", { expire: 0 });
+  }
+
   const { articles, sources } = await collectNews(NEWS_FEEDS);
   const updatedAt = new Date().toISOString();
   const headers = {

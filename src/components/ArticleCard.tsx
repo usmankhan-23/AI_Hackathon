@@ -133,11 +133,7 @@ export default function ArticleCard({ article, lang, selectedTopics, editionNow 
           <span aria-hidden="true">✕</span>
           {lang === "ur" ? "چھوڑیں" : "Skip"}
         </button>
-        {/*
-         * All sample sourceUrl values begin with "#demo-" (not "http"),
-         * so this link is intentionally hidden for all sample articles.
-         * Real source links will be added when live RSS feeds are connected.
-         */}
+        {/* Only publisher URLs are rendered as external article links. */}
         {article.sourceUrl.startsWith("http") && (
           <a
             href={article.sourceUrl}

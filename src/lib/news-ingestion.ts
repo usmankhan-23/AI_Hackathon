@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import Parser from "rss-parser";
-import { cacheLife } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import type { Article, TopicKey } from "@/lib/data";
 import type { NewsFeed } from "@/lib/news-feeds";
 
@@ -197,6 +197,7 @@ export function normalizeFeedItems(
 
 async function loadFeed(feed: NewsFeed): Promise<NormalizedFeed> {
   "use cache";
+  cacheTag("news-rss-feeds");
   cacheLife({ stale: 60, revalidate: 300, expire: 3_600 });
 
   let feedUrl: URL;
